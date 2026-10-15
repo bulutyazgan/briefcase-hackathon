@@ -70,7 +70,8 @@ async function postToStaffChannels(text: string): Promise<void> {
 }
 
 // Records the note first (synchronously, so a crash mid-post still leaves the record), then posts it.
-export function noteToStaff(messageId: string, kind: StaffNoteKind, text: string, clauses: string[]): Promise<StaffNote> {
+// `data` is extra audit detail for the event row (an invoice id, say); the note itself carries only the text.
+export function noteToStaff(messageId: string, kind: StaffNoteKind, text: string, clauses: string[], data: Record<string, unknown> = {}): Promise<StaffNote> {
   const safeText = redactProviderNames(text)
   const note: StaffNote = {
     id: crypto.randomUUID(),
@@ -85,7 +86,7 @@ export function noteToStaff(messageId: string, kind: StaffNoteKind, text: string
     message_id: messageId,
     step: STAFF_NOTE_STEP,
     summary: safeText,
-    data_json: JSON.stringify({ kind }),
+    data_json: JSON.stringify({ ...data, kind }),
     policy_clause: clauses.length ? clauses.join(',') : null,
   })
   return postToStaffChannels(`Tally: ${safeText}${clauses.length ? ` (${clauses.join(', ')})` : ''}`).then(() => note)

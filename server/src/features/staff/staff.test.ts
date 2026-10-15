@@ -43,6 +43,13 @@ describe('staff notes', () => {
     expect(listStaffNotes()[0]?.kind).toBe('approval')
   })
 
+  test('a plan-change note keeps its kind and the invoice id in the event data', async () => {
+    message('plan-1', 'Switch us to yearly', 'Client — Northwind', 'plan-thread')
+    await noteToStaff('plan-1', 'plan_change', 'Northwind Capital switched the website care plan from monthly to yearly in chat. Invoice in_plan_1 for £5,000.00 sent to billing+northwind@example.com. No action needed.', ['P8'], { stripeInvoiceId: 'in_plan_1' })
+    expect(JSON.parse(getEvent('plan-1', STAFF_NOTE_STEP)?.data_json ?? '{}')).toEqual({ kind: 'plan_change', stripeInvoiceId: 'in_plan_1' })
+    expect(listStaffNotes()[0]).toMatchObject({ messageId: 'plan-1', kind: 'plan_change', clauses: ['P8'] })
+  })
+
   test('an issued credit note leaves a P11 staff note naming the client and the amount', async () => {
     message('order-3', 'Go ahead with 100 leads', 'Client — Globex', 'globex-thread')
     const leads = Array.from({ length: 100 }, (_, index) => ({ name: `Person ${index}`, company: `Company ${index}`, url: `https://example.com/${index}` }))

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { findClient } from '../clients/clients'
-import { getEvent, insertMessage, listClients, listEvents, listInvoices, resetLedger, type ChannelMessage } from '../ledger/store'
+import { getEvent, insertMessage, listClients, listEvents, listInvoices, resetLedger, saveInvoice, type ChannelMessage } from '../ledger/store'
 import { clearSessionFacts, recall, remember } from '../memory/memory'
 import { recallCompanyFacts } from '../memory/company'
 import { decide, type BillableIntent } from '../policy/decide'
@@ -80,6 +80,48 @@ describe('intake (P12)', () => {
     expect(decision.outcome).toBe('needs_approval')
     expect(decision.clauses).toContain('P12')
     expect(decision.reason).toMatch(/first invoice for new client Initech/)
+  })
+
+  test('the account owner is staff, not a lead: no sales pitch, and a commitment onboards nobody (P5)', async () => {
+    const previousOwner = process.env.ACCOUNT_OWNER
+    process.env.ACCOUNT_OWNER = 'Account owner'
+    try {
+      const { deps, replies } = harness()
+      const handled = await handleIntake(message('owner-1', 'What do we charge per lead?', 'Account owner', 'owner-thread'), deps)
+      expect(handled).toBe(false)
+      expect(replies).toHaveLength(0)
+      expect(listEvents('owner-1')).toHaveLength(0)
+      const order = "Let's go ahead with 100 leads"
+      const intent: BillableIntent = { ...commitment(100, order), clientName: 'Account owner' }
+      const client = await onboardClient(message('owner-2', order, 'Account owner', 'owner-thread'), intent, deps)
+      expect(client).toBeNull()
+      expect(listClients()).toHaveLength(0)
+      expect(findClient('Account owner')).toBeNull()
+      expect(decide(intent, [], 100, null).outcome).toBe('refuse')
+    } finally {
+      if (previousOwner === undefined) delete process.env.ACCOUNT_OWNER
+      else process.env.ACCOUNT_OWNER = previousOwner
+    }
+  })
+
+  test('a second order from an onboarded client follows P4 only', async () => {
+    const { deps } = harness()
+    await handleIntake(message('inq-4', INQUIRY), deps)
+    const client = await onboardClient(message('commit-4', COMMITMENT), commitment(100), deps)
+    expect(client?.source).toBe('intake')
+    saveInvoice({ id: 'commit-4', message_id: 'commit-4', stripe_invoice_id: 'in_initech_1', client_id: 'cus_initech', total_pence: 40000, status: 'open', hosted_url: null, pdf_path: null })
+
+    const small = decide({ ...commitment(100, 'Go ahead with another 100 leads, same brief.'), clientName: 'Initech' }, [], 100, null)
+    expect(gateFirstInvoice(client, small)).toEqual(small)
+    expect(small.outcome).toBe('auto')
+
+    const large = decide({ ...commitment(300, 'Go ahead with another 300 leads, same brief.'), clientName: 'Initech' }, [], 300, null)
+    const gated = gateFirstInvoice(client, large)
+    expect(gated).toEqual(large)
+    expect(gated.outcome).toBe('needs_approval')
+    expect(gated.clauses).toContain('P4')
+    expect(gated.clauses).not.toContain('P12')
+    expect(gated.reason).not.toMatch(/first invoice/)
   })
 
   test('a cold commitment with no inquiry in the thread stays unknown (P5)', async () => {

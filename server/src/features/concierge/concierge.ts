@@ -9,6 +9,7 @@ import { findClient, type Client } from '../clients/clients'
 import { recallFacts, recallSeededFacts, searchCogneeDataset } from '../memory/memory'
 import { COMPANY_DATASET, readCompanyKnowledge } from '../company/company'
 import { renderInvoicePdf } from '../invoice-pdf/render'
+import { noteToStaff } from '../staff/staff'
 
 // Customer-service conversation. The LLM writes the reply and extracts a plan
 // change request; code checks P5/P8 and the rate card, then bills.
@@ -78,7 +79,7 @@ async function billYearly(message: ChannelMessage, client: Client, quote: string
   } catch (error) {
     console.error(`Plan PDF failed: ${String(error)}`)
   }
-  step(message, 'staff_note', `${client.name} switched the ${PLAN.label.toLowerCase()} from monthly to yearly in chat. Invoice ${finalized.id} for ${pounds(PLAN.yearlyPence)} sent to ${client.billingEmail}. No action needed.`, { stripeInvoiceId: finalized.id }, ['P8'])
+  void noteToStaff(message.id, 'plan_change', `${client.name} switched the ${PLAN.label.toLowerCase()} from monthly to yearly in chat. Invoice ${finalized.id} for ${pounds(PLAN.yearlyPence)} sent to ${client.billingEmail}. No action needed.`, ['P8'], { stripeInvoiceId: finalized.id })
   return `Invoice ${finalized.id}: ${pounds(PLAN.yearlyPence)} for 12 months, due in 7 days. You save ${pounds(PLAN.monthlyPence * 12 - PLAN.yearlyPence)} a year.\nPay here: ${hostedUrl}`
 }
 

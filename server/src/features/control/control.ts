@@ -43,6 +43,11 @@ export function accountOwners(): string[] {
     .filter(Boolean)
 }
 
+// Staff speak in the same channels as clients; their messages are never leads or orders.
+export function isAccountOwner(author: string): boolean {
+  return accountOwners().includes(author.trim().toLowerCase())
+}
+
 export function isPaused(): boolean {
   return getSetting(PAUSED_KEY) === 'true'
 }
@@ -90,7 +95,7 @@ export async function handleControlCommand(message: ChannelMessage): Promise<boo
       'Tally is paused (F1 kill switch). No billing or sourcing until the account owner sends /resume.')
   }
   if (command === '/resume') {
-    if (!accountOwners().includes(message.author.trim().toLowerCase())) {
+    if (!isAccountOwner(message.author)) {
       return finish(message, 'kill_switch', `Ignored /resume from ${message.author}: not the account owner.`,
         'Only the account owner can resume Tally. It stays paused.')
     }

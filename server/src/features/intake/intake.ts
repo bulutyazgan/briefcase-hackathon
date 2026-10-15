@@ -13,6 +13,7 @@ import {
 } from '../ledger/store'
 import { reply as channelReply } from '../channels/channel'
 import { findClient, type Client } from '../clients/clients'
+import { isAccountOwner } from '../control/control'
 import { remember, type MemoryRole } from '../memory/memory'
 import {
   MINIMUM_ORDER_LEADS,
@@ -143,11 +144,12 @@ function recordStep(messageId: string, step: string, summary: string, data: unkn
   })
 }
 
-// Answers an unknown sender's question from the company knowledge base. Returns false for known
-// clients, commitments, and anything that is not an inquiry, so the normal path continues.
+// Answers an unknown sender's question from the company knowledge base. Returns false for Tally,
+// the account owners, known clients, commitments, and anything that is not an inquiry, so the
+// normal path continues.
 export async function handleIntake(message: ChannelMessage, overrides: Partial<IntakeDeps> = {}): Promise<boolean> {
   const deps = { ...defaultDeps, ...overrides }
-  if (message.author === 'tally' || findClient(message.author)) return false
+  if (message.author === 'tally' || isAccountOwner(message.author) || findClient(message.author)) return false
   const extracted = await deps.extract(message)
   const inquiry = extracted.inquiry
   const quoteValid = inquiry.quote.length > 0 && message.text.includes(inquiry.quote)
