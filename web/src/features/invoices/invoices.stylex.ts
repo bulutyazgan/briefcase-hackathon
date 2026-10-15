@@ -67,7 +67,7 @@ export const styles = stylex.create({
     color: tokens.ink,
     fontFamily: tokens.fontMono,
     fontSize: tokens.textTitle,
-    fontWeight: tokens.fontRegular,
+    fontWeight: tokens.weightNormal,
     marginBlockStart: 0,
     marginBlockEnd: 0,
   },

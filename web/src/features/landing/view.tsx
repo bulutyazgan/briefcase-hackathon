@@ -5,7 +5,7 @@ const REPO_URL = 'https://github.com/cf0-enterprise/briefcase-hackathon'
 
 const STEPS = [
   { title: 'Hears the yes', body: 'Tally reads client threads in Slack and email. It acts only on a clear commitment, and it keeps the exact quote.' },
-  { title: 'Remembers the deal', body: 'Cognee holds what each client agreed, promised and disputed. "Same deal as last time" means something.' },
+  { title: 'Remembers the deal', body: 'Client memory holds what each client agreed, promised and disputed. "Same deal as last time" means something.' },
   { title: 'Decides in code', body: 'Rate card, discount cap and approval limit are policy, not prompts. The model never picks a price.' },
   { title: 'Bills in Stripe', body: 'A real invoice, a PDF with the evidence attached, and delivery of the work as soon as it is paid.' },
 ]
@@ -20,7 +20,7 @@ const POLICY = [
   ['P7', 'Never chase a disputed line.'],
 ] as const
 
-const CHANNELS = ['Slack', 'Email', 'Stripe', 'Cognee', 'Firecrawl', 'Simulator']
+const CHANNELS = ['Slack', 'Email', 'Stripe', 'Memory', 'Web research', 'Simulator']
 
 export function Landing() {
   return (

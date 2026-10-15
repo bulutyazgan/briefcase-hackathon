@@ -1,8 +1,17 @@
 import { useState, type FormEvent } from 'react'
 import * as stylex from '@stylexjs/stylex'
 import type { AppState, ApprovalRow, ChannelMessage } from '../../api'
+import { formatMoneyText } from '../../format'
 import { decideApproval, sendMessage } from './api'
 import { styles } from './inbox.stylex'
+
+const authors = [
+  'Client — Northwind',
+  'Client — Acme',
+  'Client — Globex',
+  'Account owner',
+  'Unknown sender',
+] as const
 
 interface InboxProps {
   state: AppState
@@ -20,13 +29,13 @@ function Message({ message }: { message: ChannelMessage }) {
         <strong>{message.author}</strong>
         <time dateTime={message.ts} {...stylex.props(styles.timestamp)}>{displayTime(message.ts)}</time>
       </div>
-      <p {...stylex.props(styles.messageText)}>{message.text}</p>
+      <p {...stylex.props(styles.messageText)}>{formatMoneyText(message.text)}</p>
     </article>
   )
 }
 
 export function Inbox({ state, onRefresh }: InboxProps) {
-  const [author, setAuthor] = useState('Client — Northwind')
+  const [author, setAuthor] = useState<string>(authors[0])
   const [text, setText] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -75,8 +84,7 @@ export function Inbox({ state, onRefresh }: InboxProps) {
           onChange={(event) => setAuthor(event.target.value)}
           {...stylex.props(styles.input)}
         >
-          <option>Client — Northwind</option>
-          <option>Account owner</option>
+          {authors.map((name) => <option key={name}>{name}</option>)}
         </select>
         <input
           id="message-text"
@@ -110,7 +118,7 @@ function ApprovalCard({
         <strong {...stylex.props(styles.approvalTitle)}>Approval needed</strong>
         <span {...stylex.props(styles.approvalId)}>{approval.message_id.slice(0, 8)}</span>
       </div>
-      <p {...stylex.props(styles.approvalReason)}>{approval.reason}</p>
+      <p {...stylex.props(styles.approvalReason)}>{formatMoneyText(approval.reason)}</p>
       <div {...stylex.props(styles.approvalActions)}>
         <button
           type="button"

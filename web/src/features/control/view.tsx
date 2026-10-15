@@ -1,23 +1,10 @@
-import { useEffect, useState } from 'react'
 import * as stylex from '@stylexjs/stylex'
-import { fetchControlStatus, keyModeLabel, type ControlStatus } from './api'
+import { keyModeLabel } from './api'
+import { useControlStatus } from './use-control-status'
 import { styles } from './control.stylex'
 
 export function Control() {
-  const [status, setStatus] = useState<ControlStatus | null>(null)
-  const [error, setError] = useState('')
-
-  useEffect(() => {
-    let alive = true
-    const load = () => {
-      fetchControlStatus()
-        .then((next) => { if (alive) { setStatus(next); setError('') } })
-        .catch((reason: unknown) => { if (alive) setError(String(reason)) })
-    }
-    load()
-    const timer = setInterval(load, 3000)
-    return () => { alive = false; clearInterval(timer) }
-  }, [])
+  const { status, error } = useControlStatus()
 
   return (
     <section {...stylex.props(styles.panel)} aria-labelledby="control-title">
