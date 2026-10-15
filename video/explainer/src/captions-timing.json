@@ -1,0 +1,162 @@
+[
+  {
+    "id": "c01",
+    "t0": 0.6,
+    "t1": 4.11,
+    "planned": 0.6,
+    "dur": 3.51,
+    "tempo": 1.2,
+    "text": "Your client asks for a change, in chat.",
+    "file": "voice/c01.fit.wav"
+  },
+  {
+    "id": "c02",
+    "t0": 4.36,
+    "t1": 8.27,
+    "planned": 3.6,
+    "dur": 3.91,
+    "tempo": 1,
+    "text": "Usually this is where the form, the queue and the wait begin.",
+    "file": "voice/c02.fit.wav"
+  },
+  {
+    "id": "c03",
+    "t0": 8.52,
+    "t1": 12.26,
+    "planned": 8.4,
+    "dur": 3.74,
+    "tempo": 1,
+    "text": "Tally reads the thread instead. The message is the request.",
+    "file": "voice/c03.fit.wav"
+  },
+  {
+    "id": "c04",
+    "t0": 13.4,
+    "t1": 18.07,
+    "planned": 13.4,
+    "dur": 4.67,
+    "tempo": 1,
+    "text": "It finds the client in your CRM and recalls their deal and your price list.",
+    "file": "voice/c04.fit.wav"
+  },
+  {
+    "id": "c05",
+    "t0": 18.4,
+    "t1": 22.37,
+    "planned": 18.4,
+    "dur": 3.97,
+    "tempo": 1.2,
+    "text": "The part that makes this safe: the model reads and asks.",
+    "file": "voice/c05.fit.wav"
+  },
+  {
+    "id": "c06",
+    "t0": 22.62,
+    "t1": 26.39,
+    "planned": 22.2,
+    "dur": 3.77,
+    "tempo": 1,
+    "text": "Code decides and pays, inside a written policy.",
+    "file": "voice/c06.fit.wav"
+  },
+  {
+    "id": "c07",
+    "t0": 26.64,
+    "t1": 30.03,
+    "planned": 26.4,
+    "dur": 3.39,
+    "tempo": 1.2,
+    "text": "Code checks the clauses and creates the Stripe invoice:",
+    "file": "voice/c07.fit.wav"
+  },
+  {
+    "id": "c08",
+    "t0": 30.28,
+    "t1": 34.32,
+    "planned": 30,
+    "dur": 4.04,
+    "tempo": 1,
+    "text": "five thousand pounds, yearly, due in seven days.",
+    "file": "voice/c08.fit.wav"
+  },
+  {
+    "id": "c09",
+    "t0": 34.57,
+    "t1": 40.21,
+    "planned": 34.4,
+    "dur": 5.64,
+    "tempo": 1,
+    "text": "The client gets the reply and the PDF in the same chat. They never left it.",
+    "file": "voice/c09.fit.wav"
+  },
+  {
+    "id": "c10",
+    "t0": 42.4,
+    "t1": 47.95,
+    "planned": 42.4,
+    "dur": 5.55,
+    "tempo": 1,
+    "text": "Every pound carries a receipt: their words, the remembered fact, the clause.",
+    "file": "voice/c10.fit.wav"
+  },
+  {
+    "id": "c11",
+    "t0": 50.4,
+    "t1": 55.05,
+    "planned": 50.4,
+    "dur": 4.65,
+    "tempo": 1,
+    "text": "Your team gets a note, not a ticket. The books stay right.",
+    "file": "voice/c11.fit.wav"
+  },
+  {
+    "id": "c12",
+    "t0": 56.4,
+    "t1": 60.83,
+    "planned": 56.4,
+    "dur": 4.43,
+    "tempo": 1.2,
+    "text": "Now change one thing. A dispute crosses a written limit.",
+    "file": "voice/c12.fit.wav"
+  },
+  {
+    "id": "c13",
+    "t0": 61.08,
+    "t1": 64.34,
+    "planned": 60.4,
+    "dur": 3.26,
+    "tempo": 1.2,
+    "text": "Code stops and asks a human, in the same chat.",
+    "file": "voice/c13.fit.wav"
+  },
+  {
+    "id": "c14",
+    "t0": 64.59,
+    "t1": 67.13,
+    "planned": 63.8,
+    "dur": 2.54,
+    "tempo": 1,
+    "text": "One word pauses everything.",
+    "file": "voice/c14.fit.wav"
+  },
+  {
+    "id": "c15",
+    "t0": 67.4,
+    "t1": 69.76,
+    "planned": 67.4,
+    "dur": 2.36,
+    "tempo": 1.126,
+    "text": "Said. Done. Billed.",
+    "file": "voice/c15.fit.wav"
+  },
+  {
+    "id": "c16",
+    "t0": 70.01,
+    "t1": 74.36,
+    "planned": 70,
+    "dur": 4.35,
+    "tempo": 1.06,
+    "text": "The conversation is the contract. The agent is the back office.",
+    "file": "voice/c16.fit.wav"
+  }
+]

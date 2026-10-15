@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Tally film directions</title>
+<meta name="description" content="Four directions for the Tally explainer, side by side, with the winner marked and why. Doubles as the decision log.">
+<link rel="stylesheet" href="src/shared/tokens.css">
+<style>
+  body { margin: 0; background: var(--well); color: var(--ink); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+  main { max-width: 1400px; margin: 0 auto; padding: 48px 16px 96px; }
+  h1 { font-size: 40px; line-height: 44px; letter-spacing: -0.028em; font-weight: 500; margin: 0 0 8px; }
+  .lede { font-size: 17px; line-height: 26px; color: var(--ink2); max-width: 900px; margin: 0 0 32px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+  .dir { background: var(--float); border: 1px solid var(--hairline); border-radius: var(--radius-tile); box-shadow: var(--shadow-float); padding: 20px 22px; display: flex; flex-direction: column; gap: 12px; }
+  .dir.win { outline: 2px solid var(--accent); }
+  .dir h2 { font-size: 20px; line-height: 28px; letter-spacing: -0.015em; font-weight: 500; margin: 0; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .tag { font-size: 13px; line-height: 20px; padding: 2px 10px; border-radius: var(--radius-pill); background: var(--well); color: var(--ink2); white-space: nowrap; }
+  .tag.win { background: var(--accent); color: #fff; }
+  .sketch { aspect-ratio: 16 / 9; background: var(--well); border-radius: var(--radius-control); position: relative; overflow: hidden; border: 1px solid var(--hairline); }
+  .sketch .b { position: absolute; background: var(--float); border: 1px solid var(--hairline-strong); border-radius: 6px; }
+  .sketch .g { position: absolute; background: var(--pressed); border-radius: 6px; }
+  .sketch .a { position: absolute; background: var(--accent); border-radius: 6px; }
+  .sketch .t { position: absolute; height: 6px; background: var(--ink4); border-radius: 3px; }
+  .sketch .dot { position: absolute; width: 10px; height: 10px; border-radius: 50%; background: var(--ink); }
+  .sketch .line { position: absolute; height: 2px; background: var(--ink4); }
+  .sketch img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  p { font-size: 15px; line-height: 24px; margin: 0; }
+  .k { color: var(--ink3); font-size: 13px; line-height: 20px; }
+  ul { margin: 0; padding-left: 18px; font-size: 15px; line-height: 24px; }
+  .verdict { margin-top: 32px; background: var(--float); border: 1px solid var(--hairline); border-radius: var(--radius-tile); padding: 20px 22px; }
+  .verdict h2 { font-size: 24px; line-height: 32px; letter-spacing: -0.02em; font-weight: 500; margin: 0 0 8px; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --well: #1c1c1e; --float: #262628; --ink: #f2f2f2; --ink2: #c9c9c9; --ink3: #9a9a9a; --ink4: #6f6f6f; --hairline: rgba(255,255,255,0.10); --hairline-strong: rgba(255,255,255,0.18); --pressed: rgba(255,255,255,0.08); --accent: #4fb57a; } }
+  :root[data-theme="dark"] { --well: #1c1c1e; --float: #262628; --ink: #f2f2f2; --ink2: #c9c9c9; --ink3: #9a9a9a; --ink4: #6f6f6f; --hairline: rgba(255,255,255,0.10); --hairline-strong: rgba(255,255,255,0.18); --pressed: rgba(255,255,255,0.08); --accent: #4fb57a; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Four directions for the Tally explainer</h1>
+  <p class="lede">The one idea is fixed before any of these: a client's chat message becomes a correct invoice while you watch, because the model only reads and asks, and code decides and pays inside a written policy. The directions differ in what the viewer looks at for 75 seconds. Sketches are wireframes; the winner shows real frames from the build.</p>
+
+  <div class="grid">
+    <section class="dir win" aria-label="Direction A, the winner">
+      <h2>A · The Thread <span class="tag win">Winner</span></h2>
+      <div class="sketch"><img src="review/after_punch-in.jpg" alt="Frame from the build: the chat thread on the left, the Stripe invoice with its evidence page on the right."></div>
+      <p>The whole film is one chat thread. The back office (CRM, memory, price list, policy, the Stripe invoice, the staff note) docks beside it as the agent works, in the order the code runs. The thread scrolls as the case develops; the invoice flips open to its evidence page when the client asks why.</p>
+      <ul>
+        <li>Shows the real thing: the conversation is the product surface, so the hook ("no form, no dashboard") is demonstrated, not claimed.</li>
+        <li>Objects stay alive: the message becomes the quote on the invoice; the three recall cards become three checks; the invoice grows its receipt.</li>
+        <li>The split gets a name as two column headers that stay on screen.</li>
+      </ul>
+      <p class="k">Risk: text-heavy. Answered with one focal action at a time, anchors of at most eight words, and the camera holding still while text is read.</p>
+    </section>
+
+    <section class="dir" aria-label="Direction B">
+      <h2>B · Two Queues <span class="tag">Cut</span></h2>
+      <div class="sketch">
+        <div class="b" style="left:4%;top:12%;width:44%;height:76%"></div>
+        <div class="g" style="left:8%;top:20%;width:24%;height:10%"></div><div class="g" style="left:8%;top:36%;width:30%;height:10%"></div>
+        <div class="b" style="left:52%;top:12%;width:44%;height:76%"></div>
+        <div class="t" style="left:56%;top:20%;width:30%"></div><div class="t" style="left:56%;top:30%;width:36%"></div><div class="t" style="left:56%;top:40%;width:24%"></div><div class="t" style="left:56%;top:50%;width:34%"></div>
+        <div class="line" style="left:40%;top:50%;width:12%"></div>
+      </div>
+      <p>Split screen: the chat on the left, the finance dashboard on the right, the dashboard filling itself in while nobody touches it.</p>
+      <ul><li>Gives half the frame to the thing the film says you no longer need; the viewer watches the dashboard and learns the wrong lesson.</li><li>Support and finance stay two queues on screen, which is the belief we are trying to replace.</li></ul>
+    </section>
+
+    <section class="dir" aria-label="Direction C">
+      <h2>C · The Receipt <span class="tag">Folded into A</span></h2>
+      <div class="sketch">
+        <div class="b" style="left:30%;top:6%;width:40%;height:88%"></div>
+        <div class="t" style="left:35%;top:14%;width:20%"></div>
+        <div class="t" style="left:35%;top:26%;width:30%;height:10px;background:var(--ink)"></div>
+        <div class="t" style="left:35%;top:42%;width:28%"></div><div class="t" style="left:35%;top:52%;width:24%"></div><div class="t" style="left:35%;top:62%;width:30%"></div>
+        <div class="a" style="left:35%;top:76%;width:14%;height:6px"></div>
+        <div class="g" style="left:4%;top:40%;width:20%;height:12%"></div>
+        <div class="line" style="left:24%;top:46%;width:11%"></div>
+      </div>
+      <p>The film is an invoice PDF building itself line by line, with the chat as the source of each line and the policy clause stamped on each.</p>
+      <ul><li>Strongest on "every pound explained", weakest on the hook: the message-first moment and the order of events are lost.</li><li>Kept as the Receipt beat (42 to 50 s) inside A, where the invoice grows its evidence page.</li></ul>
+    </section>
+
+    <section class="dir" aria-label="Direction D">
+      <h2>D · The Spine <span class="tag">Cut</span></h2>
+      <div class="sketch">
+        <div class="dot" style="left:10%;top:48%"></div><div class="dot" style="left:30%;top:48%"></div><div class="dot" style="left:50%;top:48%"></div><div class="dot" style="left:70%;top:48%"></div><div class="dot" style="left:88%;top:48%"></div>
+        <div class="line" style="left:12%;top:50%;width:76%"></div>
+        <div class="t" style="left:6%;top:62%;width:12%"></div><div class="t" style="left:26%;top:62%;width:12%"></div><div class="t" style="left:46%;top:62%;width:12%"></div><div class="t" style="left:66%;top:62%;width:12%"></div><div class="t" style="left:84%;top:62%;width:10%"></div>
+        <div class="g" style="left:40%;top:20%;width:20%;height:14%"></div>
+      </div>
+      <p>An animated systems diagram: adapters, ledger, memory, policy, Stripe, with one message travelling the spine and the human gate drawn as a valve.</p>
+      <ul><li>Accurate and clean, but abstract: it breaks "prefer real UI, real data and clean diagrams over illustration" for the whole film instead of for one beat.</li><li>Its one useful part, naming the split, survives as A's two column headers.</li></ul>
+    </section>
+  </div>
+
+  <div class="verdict">
+    <h2>Why A</h2>
+    <p>Go wide, then decide: B contradicts the idea, D abstracts it, C explains the receipt but not the request. A is the only direction where the opening image (a client message) can return at the end read correctly, which the story arc asks for, and the only one where every object on screen is something the code actually produces. C's evidence page and D's naming of the split were folded in. Palette, type and spacing are the brand tokens; one accent (#1D6F42) marks where code acted. Restraint cuts: no lead sourcing, no subscriptions adapter, no vendor names, no live-run figures, no particles, no gradients.</p>
+  </div>
+</main>
+</body>
+</html>

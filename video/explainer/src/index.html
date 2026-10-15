@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Tally explainer</title>
+<meta name="description" content="Tally: the finance back office that lives in your customer conversations. Rendered frame by frame from one TIMELINE.">
+<link rel="stylesheet" href="shared/tokens.css">
+<style>
+  html, body { margin: 0; padding: 0; background: var(--well); overflow: hidden; }
+  body { width: 1920px; height: 1080px; position: relative; font-family: var(--font-sans); color: var(--ink); -webkit-font-smoothing: antialiased; }
+  body.a9x16 { width: 1080px; height: 1920px; }
+  body.a1x1 { width: 1080px; height: 1080px; }
+  #stage { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; overflow: hidden; }
+  body.a9x16 #stage { transform: translate(0, 596px) scale(0.5625); }
+  body.a1x1 #stage { transform: translate(0, 300px) scale(0.5625); }
+  #cam { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; }
+  .abs { position: absolute; }
+  .el { position: absolute; will-change: transform, opacity; }
+
+  /* anchors: the on-screen words, outside the stage so they stay crisp in every cut */
+  #anchor { position: absolute; left: 120px; top: 56px; width: 1400px; font-size: 44px; line-height: 48px; font-weight: 500; letter-spacing: -0.028em; white-space: pre-line; color: var(--ink); }
+  body.a9x16 #anchor { left: 64px; top: 420px; width: 952px; font-size: 56px; line-height: 62px; }
+  body.a1x1 #anchor { left: 56px; top: 110px; width: 968px; font-size: 44px; line-height: 50px; }
+
+  /* captions: burned in from the same TIMELINE that writes captions.srt */
+  #captionLayer { position: absolute; left: 0; right: 0; bottom: 28px; display: flex; justify-content: center; pointer-events: none; }
+  body.a9x16 #captionLayer { bottom: auto; top: 1240px; }
+  body.a1x1 #captionLayer { bottom: 22px; }
+  #caption { max-width: 1400px; padding: 14px 28px; background: var(--float); border: 1px solid var(--hairline-strong); border-radius: 12px; font-size: 36px; line-height: 44px; color: var(--ink); text-align: center; box-shadow: var(--shadow-float); }
+  body.a9x16 #caption { max-width: 940px; font-size: 42px; line-height: 52px; }
+  body.a1x1 #caption { max-width: 980px; font-size: 32px; line-height: 40px; }
+
+  .colhead { position: absolute; top: 158px; font-size: 18px; line-height: 24px; color: var(--ink3); font-weight: 500; }
+  .colhead b { color: var(--ink); font-weight: 500; }
+  #hModel { left: 120px; }
+  #hCode { left: 960px; }
+
+  /* the chat panel: real UI, Telegram thread */
+  #chat { left: 120px; top: 190px; width: 760px; height: 710px; background: var(--float); border: 1px solid var(--hairline); border-radius: var(--radius-tile); box-shadow: var(--shadow-float); overflow: hidden; }
+  .chatHead { position: absolute; left: 24px; right: 24px; top: 0; height: 64px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--hairline); }
+  .chatHead .who { font-size: 20px; font-weight: 500; letter-spacing: -0.015em; }
+  .pill { display: inline-block; padding: 4px 12px; border-radius: var(--radius-pill); background: var(--well); color: var(--ink2); font-size: 15px; line-height: 22px; }
+  .pill.accent { background: var(--accent-wash); color: var(--accent); }
+  #threadClip { position: absolute; left: 24px; top: 84px; width: 712px; height: 616px; overflow: hidden; }
+  #thread { position: absolute; left: 0; top: 0; width: 712px; height: 1300px; }
+  .msg { position: absolute; max-width: 560px; padding: 16px 22px 18px; border-radius: 14px; font-size: 24px; line-height: 32px; color: var(--ink); box-sizing: border-box; }
+  .msg.client { left: 0; background: var(--well); }
+  .msg.agent { right: 0; background: var(--float); border: 1px solid var(--hairline-strong); }
+  .msg .meta { display: flex; justify-content: space-between; gap: 24px; font-size: 15px; line-height: 20px; color: var(--ink3); margin-bottom: 8px; }
+  .msg.client .meta { color: var(--ink2); } /* 8.7:1 on the well; ink3 was 4.31:1 */
+  .msg .meta .time { font-family: var(--font-mono); }
+  .msg .mono { font-family: var(--font-mono); }
+  .chip { display: inline-flex; align-items: center; gap: 10px; margin-top: 12px; padding: 10px 14px; border: 1px solid var(--hairline-strong); border-radius: var(--radius-control); font-size: 18px; line-height: 24px; color: var(--ink2); background: var(--float); }
+  .chip svg { width: 20px; height: 20px; }
+  #sweep { position: absolute; left: 0; top: 0; width: 100%; height: 100%; border-radius: 14px; background: var(--accent-wash); pointer-events: none; }
+  #quoteTag { position: absolute; left: 16px; top: 78px; z-index: 3; padding: 6px 12px; border-radius: var(--radius-pill); background: var(--accent); color: #fff; font-size: 15px; line-height: 20px; font-weight: 500; }
+  .btnrow { display: flex; gap: 12px; margin-top: 14px; }
+  .btn { padding: 10px 20px; border-radius: var(--radius-control); font-size: 18px; line-height: 24px; font-weight: 500; display: inline-block; }
+  .btn.primary { background: var(--ink); color: #fff; }
+  .btn.secondary { background: var(--float); border: 1px solid var(--hairline-strong); color: var(--ink); }
+  #apDone { position: absolute; left: 22px; bottom: 18px; font-size: 18px; line-height: 24px; color: var(--accent); font-weight: 500; }
+
+  /* the back office column */
+  #office { left: 960px; top: 190px; width: 840px; height: 710px; }
+  .card { position: absolute; left: 0; width: 840px; box-sizing: border-box; padding: 18px 24px; background: var(--float); border: 1px solid var(--hairline); border-radius: var(--radius-tile); box-shadow: var(--shadow-float); overflow: hidden; }
+  .card .label { font-size: 15px; line-height: 20px; color: var(--ink3); margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }
+  .card .body { font-size: 22px; line-height: 30px; color: var(--ink); }
+  .card .body .mono { font-family: var(--font-mono); }
+  .card .date { font-family: var(--font-mono); color: var(--ink3); font-size: 18px; margin-right: 10px; }
+  #crm { top: 0; } #mem { top: 116px; } #price { top: 232px; }
+  #policy { top: 348px; height: 176px; }
+  #policy .limits { font-family: var(--font-mono); font-size: 18px; line-height: 26px; color: var(--ink); margin-top: 2px; }
+  #policy .human { font-size: 18px; line-height: 26px; color: var(--ink2); margin-top: 6px; }
+  #chips { top: 0; height: 44px; display: flex; gap: 10px; }
+  .okchip { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: var(--radius-pill); background: var(--float); border: 1px solid var(--hairline-strong); font-size: 16px; line-height: 24px; color: var(--ink2); }
+  .okchip svg, .clause svg { width: 18px; height: 18px; }
+  #inv { top: 184px; height: 258px; }
+  #inv .amount { font-family: var(--font-mono); font-size: 56px; line-height: 64px; letter-spacing: -0.02em; margin: 6px 0 4px; }
+  #inv .line { font-size: 22px; line-height: 30px; }
+  #inv .meta { font-size: 18px; line-height: 26px; color: var(--ink3); margin-top: 2px; }
+  .clauses { display: flex; gap: 10px; margin-top: 14px; }
+  .clause { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: var(--radius-pill); border: 1px solid var(--hairline-strong); font-family: var(--font-mono); font-size: 16px; line-height: 22px; color: var(--ink2); }
+  .clause .ck { display: inline-flex; width: 18px; height: 18px; color: var(--accent); }
+  #evid { margin-top: 20px; border-top: 1px solid var(--hairline); padding-top: 14px; }
+  .evrow { display: grid; grid-template-columns: 200px 1fr; gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--hairline); font-size: 20px; line-height: 28px; }
+  .evrow .k { color: var(--ink3); font-size: 16px; line-height: 28px; }
+  .evrow .mono { font-family: var(--font-mono); font-size: 18px; }
+  #note { top: 362px; } #books { top: 522px; padding: 14px 24px; }
+  #books .body { display: flex; justify-content: space-between; font-size: 18px; line-height: 26px; color: var(--ink2); }
+  #cn { top: 0; } #cn .amount { font-family: var(--font-mono); font-size: 56px; line-height: 64px; letter-spacing: -0.02em; margin: 6px 0 4px; }
+  #cn .state { position: relative; height: 30px; margin-top: 4px; }
+  #cn .state > span { position: absolute; left: 0; top: 0; font-size: 20px; line-height: 30px; }
+  #pause { top: 300px; }
+  #pause .cmd { font-family: var(--font-mono); font-size: 32px; line-height: 40px; margin-bottom: 4px; }
+
+  /* the usual next step: a form, drawn as a ghost */
+  #form { left: 960px; top: 190px; width: 840px; padding: 24px 28px; box-sizing: border-box; background: var(--float); border: 1px dashed var(--hairline-strong); border-radius: var(--radius-tile); color: var(--ink3); }
+  #form .t { font-size: 22px; line-height: 30px; color: var(--ink2); font-weight: 500; margin-bottom: 14px; }
+  #form .f { height: 54px; border: 1px dashed var(--hairline-strong); border-radius: var(--radius-control); margin-bottom: 12px; padding: 0 16px; display: flex; align-items: center; font-size: 18px; }
+  #form .b { display: inline-block; margin-top: 6px; padding: 12px 22px; border: 1px dashed var(--hairline-strong); border-radius: var(--radius-control); font-size: 18px; }
+  #form .q { font-size: 16px; line-height: 24px; margin-top: 14px; }
+
+  /* payoff */
+  #pay { left: 0; top: 0; width: 1920px; height: 1080px; }
+  #payBubble { left: 640px; top: 250px; width: 640px; padding: 18px 24px; background: var(--float); border: 1px solid var(--hairline-strong); border-radius: 14px; font-size: 24px; line-height: 32px; box-sizing: border-box; box-shadow: var(--shadow-float); }
+  #payBubble .meta { font-size: 15px; line-height: 20px; color: var(--ink3); margin-bottom: 6px; display: flex; justify-content: space-between; }
+  #payBubble .done { margin-top: 10px; font-family: var(--font-mono); font-size: 18px; color: var(--accent); display: flex; align-items: center; gap: 8px; }
+  #payBubble .done svg { width: 18px; height: 18px; }
+  #payTitle { left: 0; width: 1920px; top: 470px; text-align: center; font-size: 84px; line-height: 92px; font-weight: 500; letter-spacing: -0.028em; display: flex; justify-content: center; align-items: center; gap: 22px; }
+  #payTitle svg { width: 76px; height: 76px; }
+  #payLine { left: 0; width: 1920px; top: 590px; text-align: center; font-size: 30px; line-height: 40px; color: var(--ink2); }
+  #payCta { left: 0; width: 1920px; top: 690px; text-align: center; }
+  #payCta span { display: inline-block; padding: 14px 28px; border-radius: var(--radius-control); background: var(--ink); color: #fff; font-size: 22px; line-height: 28px; font-weight: 500; }
+  .hidden { visibility: hidden; }
+</style>
+</head>
+<body>
+<div id="stage">
+<div id="cam">
+
+  <div id="hModel" class="colhead el"><b>The model</b> · reads and asks</div>
+  <div id="hCode" class="colhead el"><b>Code</b> · decides and pays</div>
+
+  <div id="chat" class="el">
+    <div class="chatHead"><span class="who">Northwind Capital</span><span class="pill">Telegram</span></div>
+    <div id="threadClip"><div id="thread" class="el">
+      <div id="m1" class="msg client el" style="top:0">
+        <div class="meta"><span>Client — Northwind</span><span class="time">09:41</span></div>
+        <div>Can we switch the care plan to yearly?</div>
+        <div id="sweep" class="el"></div>
+      </div>
+      <div id="quoteTag" class="el">Client quote · kept as evidence</div>
+      <div id="m2" class="msg agent el" style="top:112px">
+        <div class="meta"><span>Tally</span><span class="time">09:41</span></div>
+        <div>Found you, Northwind. Noted: your website care plan moves to yearly from the next bill. The invoice follows below.</div>
+      </div>
+      <div id="m3" class="msg agent el" style="top:296px">
+        <div class="meta"><span>Tally</span><span class="time">09:41</span></div>
+        <div><span class="mono">£5,000.00</span> for 12 months, due in 7 days. You save <span class="mono">£1,000.00</span> a year.</div>
+        <div id="pdf" class="chip el"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2h8l6 6v14H6z"/><path d="M14 2v6h6"/></svg>Invoice.pdf · evidence attached</div>
+      </div>
+      <div id="m4" class="msg client el" style="top:506px">
+        <div class="meta"><span>Client — Northwind</span><span class="time">09:52</span></div>
+        <div>Why this amount?</div>
+      </div>
+      <div id="m5" class="msg agent el" style="top:618px">
+        <div class="meta"><span>Tally</span><span class="time">09:52</span></div>
+        <div>Quote: “switch the care plan to yearly”. Price list: £5,000 a year. Memory: pays on 7-day terms. Policy: P2, P5, P8.</div>
+      </div>
+      <div id="m6" class="msg client el" style="top:830px">
+        <div class="meta"><span>Client — Northwind</span><span class="time">11:08</span></div>
+        <div>Only 240 of those were valid.</div>
+      </div>
+      <div id="m7" class="msg agent el" style="top:942px">
+        <div class="meta"><span>Tally</span><span class="time">11:08</span></div>
+        <div>60 × <span class="mono">£3.60</span> = <span class="mono">£216.00</span> back. Above the <span class="mono">£200</span> limit, so the account owner decides.</div>
+      </div>
+      <div id="ap" class="msg agent el" style="top:1086px; width:560px; height:150px">
+        <div class="meta"><span>Account owner</span><span class="time">11:08</span></div>
+        <div><span class="mono">£216.00</span> credit note needs approval (P11)</div>
+        <div id="apBtns" class="btnrow el" style="position:relative"><span id="apOk" class="btn primary el" style="position:relative">Approve</span><span class="btn secondary">Reject</span></div>
+        <div id="apDone" class="el">Approved · credit note sent</div>
+      </div>
+    </div></div>
+  </div>
+
+  <div id="form" class="el">
+    <div class="t">Plan change request</div>
+    <div class="f">Account</div>
+    <div class="f">New plan</div>
+    <div class="f">Effective date</div>
+    <div class="f">Approved by</div>
+    <span class="b">Send to finance</span>
+    <div class="q">Then the queue. Then the wait.</div>
+  </div>
+
+  <div id="office" class="el">
+    <div id="crm" class="card el"><div class="label">CRM</div><div class="body">Found Northwind Capital in the CRM (website care plan, monthly).</div></div>
+    <div id="mem" class="card el"><div class="label">Memory</div><div class="body"><span class="date">2026-08-12</span>Pays on 7-day terms.</div></div>
+    <div id="price" class="card el"><div class="label">Price list</div><div class="body">Website care plan: <span class="mono">£500</span> per month, or <span class="mono">£5,000</span> per year.</div></div>
+    <div id="policy" class="card el">
+      <div class="label"><span>Written policy</span><span class="pill">22 clauses</span></div>
+      <div class="limits">£1,000 to send · £200 to credit · £12,000 a year to change a plan</div>
+      <div class="body">Code enforces every clause. The audit log cites it by id.</div>
+      <div class="human">Above these, a human approves in the chat.</div>
+    </div>
+    <div id="chips" class="el">
+      <span class="okchip"><svg viewBox="0 0 24 24" fill="none" stroke="#1D6F42" stroke-width="2.5"><path d="M5 12l5 5 9-10"/></svg>CRM</span>
+      <span class="okchip"><svg viewBox="0 0 24 24" fill="none" stroke="#1D6F42" stroke-width="2.5"><path d="M5 12l5 5 9-10"/></svg>Memory</span>
+      <span class="okchip"><svg viewBox="0 0 24 24" fill="none" stroke="#1D6F42" stroke-width="2.5"><path d="M5 12l5 5 9-10"/></svg>Price list</span>
+    </div>
+    <div id="inv" class="card el">
+      <div class="label"><span>Stripe invoice</span><span style="position:relative; width:90px; height:30px"><span id="pillOpen" class="pill el" style="right:0">open</span><span id="pillSent" class="pill accent el" style="right:0">sent</span></span></div>
+      <div id="amt" class="el" style="position:relative">
+        <div class="amount">£5,000.00</div>
+        <div class="line">Website care plan, yearly (was £500.00 per month)</div>
+        <div class="meta">Northwind Capital · due in 7 days</div>
+      </div>
+      <div class="clauses">
+        <span class="clause"><span id="ck1" class="ck el" style="position:relative"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5 9-10"/></svg></span>P2 · price list</span>
+        <span class="clause"><span id="ck2" class="ck el" style="position:relative"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5 9-10"/></svg></span>P5 · known client</span>
+        <span class="clause"><span id="ck3" class="ck el" style="position:relative"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5 9-10"/></svg></span>P8 · margin kept</span>
+      </div>
+      <div id="evid">
+        <div id="ev1" class="evrow el" style="position:relative"><span class="k">Client quote</span><span>“Can we switch the care plan to yearly?”</span></div>
+        <div id="ev2" class="evrow el" style="position:relative"><span class="k">Remembered fact</span><span><span class="mono">2026-08-12</span> · Pays on 7-day terms</span></div>
+        <div id="ev3" class="evrow el" style="position:relative"><span class="k">Price list</span><span class="mono">£5,000 per year (was £500 per month)</span></div>
+        <div id="ev4" class="evrow el" style="position:relative"><span class="k">Policy</span><span class="mono">P2, P5, P8</span></div>
+      </div>
+    </div>
+    <div id="note" class="card el"><div class="label"><span>Staff note</span><span class="pill">P8</span></div><div class="body">Northwind Capital switched the website care plan from monthly to yearly in chat. Invoice for £5,000.00 sent. No action needed.</div></div>
+    <div id="books" class="card el"><div class="body"><span>Books · journal posted</span><span class="mono">£5,000.00 · VAT 20%</span></div></div>
+    <div id="cn" class="card el">
+      <div class="label"><span>Stripe credit note</span><span class="pill">P11</span></div>
+      <div class="amount">£216.00</div>
+      <div class="body">60 × £3.60 · the ones that were not valid</div>
+      <div class="state"><span id="cnWait" class="el" style="color:var(--ink2)">Above the £200 auto limit · waiting for the account owner</span><span id="cnOk" class="el" style="color:var(--accent)">Approved by the account owner · sent to Stripe</span></div>
+    </div>
+    <div id="pause" class="card el"><div class="cmd">/pause</div><div class="body">One word in any chat stops money moving. Only the account owner can /resume.</div></div>
+  </div>
+
+  <div id="pay" class="el">
+    <div id="payBubble" class="el">
+      <div class="meta"><span>Client — Northwind</span><span>Telegram</span></div>
+      <div>Can we switch the care plan to yearly?</div>
+      <div class="done"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5 9-10"/></svg>Billed · £5,000.00 · explained</div>
+    </div>
+    <div id="payTitle" class="el"><svg viewBox="0 0 256 256" aria-hidden="true"><path fill="currentColor" d="M 67.11 62.22 L 167.11 62.22 A 22 22 0 0 1 189.11 84.22 L 189.11 88.14 C 189.11 98.51 196.02 105.42 206.39 105.42 C 222.3 105.42 235.19 118.31 235.19 134.22 C 235.19 150.13 222.3 163.02 206.39 163.02 C 196.02 163.02 189.11 169.93 189.11 180.3 L 189.11 184.22 A 22 22 0 0 1 167.11 206.22 L 163.19 206.22 C 152.82 206.22 145.91 199.31 145.91 188.94 C 145.91 173.03 133.02 160.14 117.11 160.14 C 101.2 160.14 88.31 173.03 88.31 188.94 C 88.31 199.31 81.4 206.22 71.03 206.22 L 67.11 206.22 A 22 22 0 0 1 45.11 184.22 L 45.11 84.22 A 22 22 0 0 1 67.11 62.22 Z"/></svg><span>Said. Done. Billed.</span></div>
+    <div id="payLine" class="el">The conversation is the contract. The agent is the back office.</div>
+    <div id="payCta" class="el"><span>Explore Tally</span></div>
+  </div>
+
+</div>
+</div>
+<div id="anchor"></div>
+<div id="captionLayer"><div id="caption"></div></div>
+
+<script src="timeline.js"></script>
+<script src="captions-timing.js"></script>
+<script>
+(function () {
+  const params = new URLSearchParams(location.search)
+  const aspect = params.get('aspect') || '16x9'
+  if (aspect === '9x16') document.body.classList.add('a9x16')
+  if (aspect === '1x1') document.body.classList.add('a1x1')
+  const reduced = params.get('rm') === '1'
+
+  // Easing: settles without bounce. Reduced motion cuts at the start of every move.
+  const E = {
+    out: p => 1 - Math.pow(1 - p, 4),
+    inOut: p => p < 0.5 ? 8 * p * p * p * p : 1 - Math.pow(-2 * p + 2, 4) / 2,
+    lin: p => p,
+  }
+  const ease = (name, p) => reduced ? (p > 0 ? 1 : 0) : E[name](p)
+
+  const els = {}, base = {}, tracks = []
+  function reg(id, b) { els[id] = document.getElementById(id); base[id] = Object.assign({ x: 0, y: 0, o: 1, s: 1 }, b || {}) }
+  function tw(id, t0, dur, to, e) { tracks.push({ id, t0, t1: t0 + dur, to, ease: e || 'out' }) }
+
+  // Registration: hidden things start hidden; moves are offsets from the CSS position.
+  const IN = { o: 0, y: 24 }, INS = { o: 0, y: 24, s: 0.98 }, HID = { o: 0 }
+  reg('cam'); reg('hModel', { o: 0, y: 8 }); reg('hCode', { o: 0, y: 8 })
+  reg('chat'); reg('thread'); reg('office'); reg('pay')
+  ;['m1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7', 'ap'].forEach(id => reg(id, INS))
+  reg('sweep', { o: 0, cr: 100 }); reg('quoteTag', { o: 0, y: 10 }); reg('pdf', { o: 0, y: 10 })
+  reg('apBtns'); reg('apOk'); reg('apDone', HID)
+  reg('form', { o: 0, y: 40 })
+  ;['crm', 'mem', 'price', 'policy', 'chips', 'inv', 'note', 'books', 'cn', 'pause'].forEach(id => reg(id, IN))
+  reg('amt', { o: 0, y: 10 }); reg('pillOpen', HID); reg('pillSent', HID)
+  ;['ck1', 'ck2', 'ck3'].forEach(id => reg(id, { o: 0, s: 0.6 }))
+  ;['ev1', 'ev2', 'ev3', 'ev4'].forEach(id => reg(id, { o: 0, y: 10 }))
+  reg('cnWait'); reg('cnOk', HID)
+  reg('payBubble', { o: 0, y: 30, s: 0.96 }); reg('payTitle', { o: 0, y: 20 }); reg('payLine', { o: 0, y: 16 }); reg('payCta', { o: 0, y: 16 })
+
+  // S1 Question: the message arrives, then the usual next step rises.
+  tw('m1', 0.5, 0.6, { o: 1, y: 0, s: 1 })
+  tw('form', 3.3, 0.7, { o: 1, y: 0 })
+  tw('form', 8.0, 0.5, { o: 0, y: -16 })
+  // S2 Reads: a reading sweep over the message; the quote is tagged as evidence.
+  tw('sweep', 8.5, 0.1, { o: 1 })
+  tw('sweep', 8.6, 1.4, { cr: 0 }, 'inOut')
+  tw('sweep', 11.4, 0.4, { o: 0 })
+  tw('quoteTag', 10.2, 0.5, { o: 1, y: 0 })
+  // S3 Recalls: CRM, memory, price list dock in order; the agent replies.
+  tw('crm', 13.5, 0.6, { o: 1, y: 0 })
+  tw('mem', 14.9, 0.6, { o: 1, y: 0 })
+  tw('price', 16.3, 0.6, { o: 1, y: 0 })
+  tw('m2', 17.0, 0.6, { o: 1, y: 0, s: 1 })
+  // S4 Split: the two columns get their names; the written policy docks.
+  tw('hModel', 18.5, 0.5, { o: 1, y: 0 })
+  tw('hCode', 18.5, 0.5, { o: 1, y: 0 })
+  tw('policy', 22.3, 0.6, { o: 1, y: 0 })
+  // S5 Bills: recall cards become chips, policy compacts, the invoice is built clause by clause.
+  tw('crm', 26.2, 0.5, { o: 0, y: -30 }); tw('mem', 26.2, 0.5, { o: 0, y: -30 }); tw('price', 26.2, 0.5, { o: 0, y: -30 })
+  tw('chips', 26.4, 0.5, { o: 1, y: 0 })
+  tw('policy', 26.4, 0.6, { y: -284, h: 88 }, 'inOut')
+  tw('inv', 26.8, 0.6, { o: 1, y: 0 })
+  tw('ck1', 27.0, 0.3, { o: 1, s: 1 }); tw('ck2', 27.8, 0.3, { o: 1, s: 1 }); tw('ck3', 28.6, 0.3, { o: 1, s: 1 })
+  tw('amt', 30.2, 0.5, { o: 1, y: 0 })
+  tw('pillOpen', 30.3, 0.3, { o: 1 })
+  // S6 Reply: the reply and the PDF land in the chat; the invoice reads sent.
+  tw('m3', 35.0, 0.6, { o: 1, y: 0, s: 1 })
+  tw('pdf', 37.4, 0.5, { o: 1, y: 0 })
+  tw('pillOpen', 37.4, 0.3, { o: 0 }); tw('pillSent', 37.4, 0.3, { o: 1 })
+  // S7 Receipt: the thread scrolls, the client asks why, the camera punches in on the evidence.
+  tw('thread', 42.0, 0.8, { y: -220 }, 'inOut')
+  tw('m4', 42.6, 0.5, { o: 1, y: 0, s: 1 })
+  tw('policy', 42.2, 0.4, { o: 0 })
+  tw('inv', 42.2, 0.8, { y: -120, h: 478 }, 'inOut')
+  tw('cam', 42.4, 1.0, { x: -76.8, y: -43.2, s: 1.08 }, 'inOut')
+  tw('ev1', 43.4, 0.5, { o: 1, y: 0 }); tw('ev2', 44.2, 0.5, { o: 1, y: 0 }); tw('ev3', 45.0, 0.5, { o: 1, y: 0 }); tw('ev4', 45.8, 0.5, { o: 1, y: 0 })
+  tw('m5', 46.6, 0.6, { o: 1, y: 0, s: 1 })
+  // S8 Note: camera returns, the evidence folds away, the staff note and the books dock.
+  tw('cam', 50.0, 1.0, { x: 0, y: 0, s: 1 }, 'inOut')
+  tw('ev1', 50.2, 0.3, { o: 0 }); tw('ev2', 50.2, 0.3, { o: 0 }); tw('ev3', 50.2, 0.3, { o: 0 }); tw('ev4', 50.2, 0.3, { o: 0 })
+  tw('inv', 50.2, 0.8, { h: 258 }, 'inOut')
+  tw('note', 51.0, 0.6, { o: 1, y: 0 })
+  tw('books', 53.2, 0.6, { o: 1, y: 0 })
+  // S9 Turn: a dispute crosses a limit; code stops and asks the owner in the chat; /pause.
+  tw('chips', 56.0, 0.5, { o: 0, y: -24 }); tw('inv', 56.0, 0.5, { o: 0, y: -144 }); tw('note', 56.0, 0.5, { o: 0, y: -24 }); tw('books', 56.0, 0.5, { o: 0, y: -24 })
+  tw('thread', 56.2, 0.8, { y: -700 }, 'inOut')
+  tw('m6', 56.8, 0.6, { o: 1, y: 0, s: 1 })
+  tw('cn', 58.2, 0.6, { o: 1, y: 0 })
+  tw('m7', 59.4, 0.6, { o: 1, y: 0, s: 1 })
+  tw('ap', 60.4, 0.6, { o: 1, y: 0, s: 1 })
+  tw('apOk', 62.0, 0.12, { s: 0.94 }); tw('apOk', 62.12, 0.3, { s: 1 })
+  tw('apBtns', 62.5, 0.3, { o: 0 }); tw('apDone', 62.6, 0.4, { o: 1 })
+  tw('cnWait', 62.6, 0.3, { o: 0 }); tw('cnOk', 62.7, 0.4, { o: 1 })
+  tw('pause', 64.2, 0.6, { o: 1, y: 0 })
+  // S10 Payoff: the opening message again, now read correctly.
+  tw('chat', 67.0, 0.5, { o: 0 }); tw('office', 67.0, 0.5, { o: 0 }); tw('hModel', 67.0, 0.5, { o: 0 }); tw('hCode', 67.0, 0.5, { o: 0 })
+  tw('payBubble', 67.4, 0.7, { o: 1, y: 0, s: 1 })
+  tw('payTitle', 67.9, 0.6, { o: 1, y: 0 })
+  tw('payLine', 69.9, 0.6, { o: 1, y: 0 })
+  tw('payCta', 71.9, 0.6, { o: 1, y: 0 })
+
+  tracks.sort((a, b) => a.t0 - b.t0)
+
+  const anchorEl = document.getElementById('anchor')
+  const captionEl = document.getElementById('caption')
+  const captions = (window.CAPTIONS_TIMING && window.CAPTIONS_TIMING.length) ? window.CAPTIONS_TIMING : TIMELINE.captions
+
+  function fade(t, t0, t1, fin, fout) {
+    if (t < t0 || t >= t1) return 0
+    return Math.min(1, (t - t0) / fin, (t1 - t) / fout)
+  }
+
+  function seek(t) {
+    const st = {}
+    for (const id in base) st[id] = Object.assign({}, base[id])
+    for (const tr of tracks) {
+      if (t < tr.t0) continue
+      const p = tr.t1 > tr.t0 ? ease(tr.ease, Math.min(1, (t - tr.t0) / (tr.t1 - tr.t0))) : 1
+      const s = st[tr.id]
+      for (const k in tr.to) {
+        const from = s[k] === undefined ? tr.to[k] : s[k]
+        s[k] = from + (tr.to[k] - from) * p
+      }
+    }
+    for (const id in st) {
+      const el = els[id], s = st[id]
+      el.style.transform = `translate(${s.x.toFixed(3)}px, ${s.y.toFixed(3)}px) scale(${s.s.toFixed(5)})`
+      el.style.opacity = s.o.toFixed(4)
+      el.style.visibility = s.o <= 0.001 ? 'hidden' : 'visible'
+      if (s.h !== undefined) el.style.height = `${s.h.toFixed(2)}px`
+      if (s.cr !== undefined) el.style.clipPath = `inset(0 ${s.cr.toFixed(3)}% 0 0)`
+    }
+    const scene = TIMELINE.scenes.find(sc => t >= sc.t0 && t < sc.t1) || TIMELINE.scenes[TIMELINE.scenes.length - 1]
+    anchorEl.textContent = scene.anchor
+    anchorEl.style.opacity = fade(t, scene.t0 + 0.2, scene.t1, 0.5, 0.3).toFixed(4)
+    const cap = captions.find(c => t >= c.t0 && t < c.t1)
+    captionEl.textContent = cap ? cap.text : ''
+    captionEl.style.opacity = cap ? fade(t, cap.t0, cap.t1, 0.18, 0.18).toFixed(4) : '0'
+    captionEl.style.visibility = cap ? 'visible' : 'hidden'
+    window.__t = t
+  }
+  window.seek = seek
+  window.TRACKS = tracks
+  seek(parseFloat(params.get('t') || '0'))
+})()
+</script>
+</body>
+</html>
