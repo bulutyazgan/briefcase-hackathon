@@ -4,9 +4,10 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import { channelRoutes } from './features/channels/routes'
 import { startSlack } from './features/channels/slack'
+import { startTelegram } from './features/channels/telegram'
 import { handleApproval, startAgentLoop } from './features/agent/agent'
 import { BillingBlockedError, simulateInvoicePayment } from './features/billing/billing'
-import { getApproval, getEvent, getInvoice, getState } from './features/ledger/store'
+import { getApproval, getEvent, getInvoice, getMessage, getState, listInvoices } from './features/ledger/store'
 import { leadsCsv } from './features/leads/leads'
 import { controlStatus } from './features/control/control'
 import { invoiceLeadRows } from './features/meters/meters'
@@ -17,11 +18,13 @@ import { getStripe } from './features/billing/billing'
 import { booksRoutes } from './features/books/routes'
 import { listOpportunityViews } from './features/opportunities/opportunities'
 
-const leadsSchema = z.array(z.object({
+const leadSchema = z.object({
   name: z.string(),
   company: z.string(),
   url: z.string(),
-}))
+})
+const leadsSchema = z.array(leadSchema)
+const sourcedEventSchema = z.object({ leads: leadsSchema })
 
 const invoicePdfDirectory = resolve(import.meta.dir, '../out')
 
@@ -52,6 +55,33 @@ app.route('/api/buyer', buyerRoutes)
 app.get('/api/control', (context) => context.json(controlStatus()))
 app.route('/api/books', booksRoutes)
 app.get('/api/opportunities', (context) => context.json({ opportunities: listOpportunityViews() }))
+
+app.get('/api/leads', (context) => {
+  const leads = listInvoices().flatMap((invoice) => {
+    const event = getEvent(invoice.message_id, 'size')
+    if (!event) return []
+    let payload: unknown
+    try {
+      payload = JSON.parse(event.data_json)
+    } catch {
+      return []
+    }
+    const saved = sourcedEventSchema.safeParse(payload)
+    if (!saved.success) return []
+    const author = getMessage(invoice.message_id)?.author
+    const clientName = author?.replace(/^Client — /, '') || invoice.client_id || 'Unknown client'
+    return saved.data.leads.map((lead, index) => ({
+      id: `${invoice.id}:${index}`,
+      ...lead,
+      invoiceId: invoice.id,
+      clientName,
+      invoiceStatus: invoice.status,
+      totalPence: invoice.total_pence,
+      sourcedAt: event.created_at,
+    }))
+  })
+  return context.json(leads)
+})
 
 app.post('/api/approvals/:id', async (context) => {
   const messageId = context.req.param('id')
@@ -115,6 +145,13 @@ app.get('/api/invoices/:id/pdf', async (context) => {
 startAgentLoop()
 startBuyerLoop(() => stripePayments(getStripe()))
 void startSlack().catch((error) => console.error(`Slack Socket Mode failed: ${String(error)}`))
+void startTelegram(async (messageId, action) => {
+  const approval = getApproval(messageId)
+  if (!approval) return 'Approval not found.'
+  if (approval.status !== 'pending') return 'This approval is already closed.'
+  void handleApproval(messageId, action).catch((error) => console.error(`Telegram approval failed: ${String(error)}`))
+  return action === 'approve' ? 'Approved. Creating the invoice.' : 'Rejected.'
+}).catch((error) => console.error(`Telegram failed: ${String(error)}`))
 
 const port = Number(process.env.PORT ?? 8787)
 Bun.serve({ port, fetch: app.fetch })

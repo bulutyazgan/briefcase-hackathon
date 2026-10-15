@@ -1,26 +1,20 @@
 import { useState } from 'react'
 import * as stylex from '@stylexjs/stylex'
+import { HugeiconsIcon } from '@hugeicons/react'
+import { CreditCardIcon, Download01Icon } from '@hugeicons/core-free-icons'
 import type { AppState, EventRow, InvoiceRow } from '../../api'
 import { Button } from '../../components/ui/button'
 import { Page, Opening, Section } from '../../components/ui/page'
-import { RowList, RowListItem } from '../../components/ui/row-list'
+import { DataTable } from '../../components/ui/data-table'
+import type { DataTableColumn } from '../../components/ui/data-table'
 import { StatStrip } from '../../components/ui/stat-strip'
 import { Text } from '../../components/ui/text'
-import { Table } from '../../components/ui/table'
 import { content } from '../../components/ui/content.stylex'
-import { motion } from '../../motion.stylex'
-import { useValueChanged } from '../../motion'
-import { Link } from '../../router'
+import { Link, navigate } from '../../router'
 import { evidenceFromEvent, simulateInvoicePayment } from './api'
 
 function money(pence: number): string {
   return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(pence / 100)
-}
-
-// Cross-fades its colour when the status changes and pulses once, so "paid" is seen to happen.
-function StatusPill({ invoice }: { invoice: InvoiceRow }) {
-  const changed = useValueChanged(`invoice-status:${invoice.id}`, invoice.status)
-  return <span {...stylex.props(content.status, motion.tinted, changed && motion.pulse)}>{invoice.status === 'paid' ? 'Paid' : 'Open'}</span>
 }
 
 function clientName(state: AppState, invoice: InvoiceRow): string {
@@ -51,15 +45,28 @@ function arithmetic(event: EventRow | undefined, totalPence: number): string {
   }
 }
 
+function leadCount(state: AppState, invoice: InvoiceRow): number {
+  const event = state.events.find((item) => item.message_id === invoice.message_id && item.step === 'size')
+  if (!event) return 0
+  try {
+    const parsed: unknown = JSON.parse(event.data_json)
+    return isRecord(parsed) && Array.isArray(parsed.leads) ? parsed.leads.length : 0
+  } catch {
+    return 0
+  }
+}
+
 export function Invoices({ state }: { state: AppState }) {
   const open = state.invoices.filter((invoice) => invoice.status !== 'paid')
   const total = state.invoices.reduce((sum, invoice) => sum + invoice.total_pence, 0)
   const openTotal = open.reduce((sum, invoice) => sum + invoice.total_pence, 0)
-  const columns = [
-    { key: 'client', label: 'Client', render: (invoice: InvoiceRow) => <Link to={`/app/invoices/${encodeURIComponent(invoice.id)}`} {...stylex.props(content.link)}>{clientName(state, invoice)}</Link> },
-    { key: 'amount', label: 'Amount', mono: true, render: (invoice: InvoiceRow) => <Text role="mono">{money(invoice.total_pence)}</Text> },
-    { key: 'status', label: 'Status', render: (invoice: InvoiceRow) => <StatusPill invoice={invoice} /> },
-    { key: 'created', label: 'Created', mono: true, render: (invoice: InvoiceRow) => <Text role="mono">{new Date(invoice.created_at).toLocaleDateString('en-GB')}</Text> },
+  const columns: DataTableColumn<InvoiceRow>[] = [
+    { key: 'id', label: 'Invoice ID', mono: true, render: (invoice) => invoice.id, sortValue: (invoice) => invoice.id, searchValue: (invoice) => invoice.id },
+    { key: 'client', label: 'Client', render: (invoice) => clientName(state, invoice), sortValue: (invoice) => clientName(state, invoice), searchValue: (invoice) => clientName(state, invoice) },
+    { key: 'leads', label: 'Leads', align: 'end', render: (invoice) => leadCount(state, invoice), sortValue: (invoice) => leadCount(state, invoice) },
+    { key: 'total', label: 'Total', align: 'end', mono: true, render: (invoice) => money(invoice.total_pence), sortValue: (invoice) => invoice.total_pence },
+    { key: 'status', label: 'Status', render: (invoice) => invoice.status, sortValue: (invoice) => invoice.status },
+    { key: 'issued', label: 'Issued', mono: true, render: (invoice) => new Date(invoice.created_at).toLocaleDateString('en-GB'), sortValue: (invoice) => invoice.created_at },
   ]
   return (
     <Page>
@@ -70,7 +77,7 @@ export function Invoices({ state }: { state: AppState }) {
         { label: 'Total billed', value: money(total), mono: true },
       ]} />
       <Section title="Invoices" description="Select an invoice to review its evidence and PDF">
-        {state.invoices.length ? <Table rows={state.invoices} columns={columns} rowKey={(invoice) => invoice.id} /> : <div {...stylex.props(content.well)}><Text role="compact">No invoices have been created yet.</Text></div>}
+        <DataTable rows={state.invoices} columns={columns} rowKey={(invoice) => invoice.id} onRowClick={(invoice) => navigate(`/app/invoices/${encodeURIComponent(invoice.id)}`)} searchPlaceholder="Search invoices" emptyTitle="No invoices have been created" emptyBody="Invoices will appear here after a client commitment is approved." />
       </Section>
     </Page>
   )
@@ -110,14 +117,15 @@ export function InvoiceDetail({ state, invoiceId, onRefresh }: { state: AppState
         lede="The invoice, client agreement and policy decision are linked in one record."
         tools={<>
           {invoice.hosted_url ? <a href={invoice.hosted_url} target="_blank" rel="noreferrer" {...stylex.props(content.link)}>View Stripe invoice</a> : null}
-          <Button variant="primary" disabled={paid || paying || !invoice.stripe_invoice_id} onClick={() => void pay()}>{paid ? 'Pay as client (test card)' : paying ? 'Processing payment' : 'Pay as client (test card)'}</Button>
+          <a href={invoicePath} download={`invoice-${invoice.id}.pdf`} {...stylex.props(content.link, content.iconLabel)}><HugeiconsIcon icon={Download01Icon} size={16} strokeWidth={1.5} aria-hidden="true" {...stylex.props(content.icon)} />Download PDF</a>
+          <Button variant="primary" disabled={paid || paying || !invoice.stripe_invoice_id} onClick={() => void pay()}><span {...stylex.props(content.iconLabel)}><HugeiconsIcon icon={CreditCardIcon} size={16} strokeWidth={1.5} aria-hidden="true" {...stylex.props(content.icon)} />{paying ? 'Processing payment' : 'Pay as client (test card)'}</span></Button>
         </>}
       />
       {paid ? <Text role="compact">This invoice is already paid.</Text> : null}
       {paymentError ? <p role="alert" {...stylex.props(content.error)}>{paymentError}</p> : null}
       <div id="invoice-amount"><StatStrip items={[
         { label: 'Amount', value: money(invoice.total_pence), mono: true },
-        { label: 'Status', value: <StatusPill invoice={invoice} /> },
+        { label: 'Status', value: paid ? 'Paid' : 'Open' },
         { label: 'Client', value: client },
         { label: 'Stripe invoice', value: invoice.stripe_invoice_id || 'Not created', mono: true },
       ]} /></div>

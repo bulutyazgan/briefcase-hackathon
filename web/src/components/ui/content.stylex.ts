@@ -5,6 +5,8 @@ export const content = stylex.create({
   card: { backgroundColor: color.canvas, borderColor: color.hairline, borderRadius: radius.tile, borderStyle: 'solid', borderWidth: '1px', padding: space.lg },
   well: { backgroundColor: color.well, borderRadius: radius.tile, padding: space.lg },
   stack: { display: 'flex', flexDirection: 'column', gap: space.md },
+  iconLabel: { alignItems: 'center', display: 'inline-flex', gap: space.sm, lineHeight: 'inherit' },
+  icon: { flexShrink: 0 },
   full: { width: '100%' },
   alignTop: { alignItems: 'flex-start' },
   twoCol: { display: 'grid', gap: space.lg, gridTemplateColumns: 'minmax(0, 1.7fr) minmax(260px, 1fr)', '@media (max-width: 960px)': { gridTemplateColumns: '1fr' } },

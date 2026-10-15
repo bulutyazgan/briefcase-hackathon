@@ -37,11 +37,44 @@ export interface ApprovalRow {
   reason: string
 }
 
+export interface SourcedLead {
+  id: string
+  name: string
+  company: string
+  url: string
+  invoiceId: string
+  clientName: string
+  invoiceStatus: string
+  totalPence: number
+  sourcedAt: string
+}
+
 export interface AppState {
   messages: ChannelMessage[]
   invoices: InvoiceRow[]
   approvals: ApprovalRow[]
   events: EventRow[]
+}
+
+function isSourcedLead(value: unknown): value is SourcedLead {
+  return isRecord(value)
+    && typeof value.id === 'string'
+    && typeof value.name === 'string'
+    && typeof value.company === 'string'
+    && typeof value.url === 'string'
+    && typeof value.invoiceId === 'string'
+    && typeof value.clientName === 'string'
+    && typeof value.invoiceStatus === 'string'
+    && typeof value.totalPence === 'number'
+    && typeof value.sourcedAt === 'string'
+}
+
+export async function fetchLeads(): Promise<SourcedLead[]> {
+  const response = await fetch('/api/leads')
+  if (!response.ok) throw new Error(`Leads request failed (${response.status}).`)
+  const payload: unknown = await response.json()
+  if (!Array.isArray(payload) || !payload.every(isSourcedLead)) throw new Error('The server returned an invalid leads response.')
+  return payload
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
