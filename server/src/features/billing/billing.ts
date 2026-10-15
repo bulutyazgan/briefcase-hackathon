@@ -63,6 +63,11 @@ export async function createInvoice(
   const finalized = await stripe.invoices.finalizeInvoice(invoice.id, {}, {
     idempotencyKey: `finalize-gbp-${messageId}`,
   })
+  await stripe.invoices.sendInvoice(finalized.id, {}, {
+    idempotencyKey: `send-gbp-${messageId}`,
+  }).catch((error: unknown) => {
+    console.error('Stripe could not email the invoice.', error)
+  })
   const hostedUrl = finalized.hosted_invoice_url
   if (!hostedUrl) throw new Error('Stripe did not return a hosted invoice URL.')
   saveInvoice({
