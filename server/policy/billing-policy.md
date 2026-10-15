@@ -11,6 +11,7 @@
 - `P9` Sourcing spend caps: every Treg call carries `X-Treg-Route-Max-Cost`, and each order has a total sourcing cap. Code enforces both.
 - `P10` Treg calls only to an allowlist of catalogue endpoints (people, company, buying signals).
 - `P11` A client dispute about delivered leads earns a credit note for the leads the client says were invalid, capped at the number delivered, at the invoice's net price per lead. Auto-issue credit notes up to £200. Above that, one approval from the account owner. The dispute is remembered, so P7 stops reminders.
+- `P13` A known client can change their subscription plan in conversation, only to a plan in the catalogue (lead list, 100 leads a month, billed monthly or yearly) at their price list rate. Discounts apply only when remembered (P3). A plan worth up to £12,000 net a year applies automatically; above that, one approval from the account owner. The Stripe subscription is created or updated with prorations, the plan is remembered, and staff get a note.
 
 ## Opportunities
 
