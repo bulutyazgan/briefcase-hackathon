@@ -84,6 +84,10 @@ database.exec(`
     status TEXT NOT NULL,
     reason TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
 `)
 
 export function insertMessage(message: ChannelMessage): ChannelMessage {
@@ -218,4 +222,16 @@ export function getState(): AppState {
 
 export function resetLedger(): void {
   database.exec('DELETE FROM events; DELETE FROM invoices; DELETE FROM approvals; DELETE FROM messages;')
+}
+
+export function getSetting(key: string): string | null {
+  const row = database.query<{ value: string }, [string]>('SELECT value FROM settings WHERE key = ?').get(key)
+  return row?.value ?? null
+}
+
+export function setSetting(key: string, value: string): void {
+  database.query(`
+    INSERT INTO settings (key, value) VALUES (?, ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+  `).run(key, value)
 }

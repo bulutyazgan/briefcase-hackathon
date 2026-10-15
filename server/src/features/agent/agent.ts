@@ -20,6 +20,7 @@ import { canonicalClientName, recallFacts, recallSeededFacts, rememberFact } fro
 import { leadsCsv, seedLeads, sourceLeads, type Lead } from '../leads/leads'
 import { decide, type BillableIntent, type Decision, type MemoryFact } from '../policy/decide'
 import { renderInvoicePdf } from '../invoice-pdf/render'
+import { blockIfPaused, handleControlCommand } from '../control/control'
 
 const intentSchema = z.object({
   isCommitment: z.boolean(),
@@ -156,6 +157,7 @@ async function explainLatestInvoice(message: ChannelMessage): Promise<boolean> {
 
 async function continueBilling(message: ChannelMessage, saved: SavedDecision): Promise<void> {
   const { intent, facts, leads, decision } = saved
+  if (await blockIfPaused(message)) return
   try {
     const result = await createInvoice(message.id, intent, decision)
     recordStep(message.id, 'bill', 'Created and finalised a Stripe invoice.', {
@@ -218,6 +220,7 @@ async function continueBilling(message: ChannelMessage, saved: SavedDecision): P
 }
 
 async function processMessage(message: ChannelMessage): Promise<void> {
+  if (await handleControlCommand(message)) return
   try {
     if (/\bwhy\b/i.test(message.text) && await explainLatestInvoice(message)) return
     const extracted = await extractIntent(message)

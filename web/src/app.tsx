@@ -2,6 +2,7 @@ import { useState, useSyncExternalStore } from 'react'
 import * as stylex from '@stylexjs/stylex'
 import { getSnapshot, refreshState, subscribe } from './app-state'
 import { Audit } from './features/audit/view'
+import { Control } from './features/control/view'
 import { Inbox } from './features/inbox/view'
 import { Invoices } from './features/invoices/view'
 import { styles } from './app.stylex'
@@ -40,6 +41,7 @@ export function App() {
               <div {...stylex.props(styles.columns)}>
                 <Inbox state={state} onRefresh={() => void refreshState()} />
                 <div {...stylex.props(styles.right)}>
+                  <Control />
                   <Invoices
                     state={state}
                     selectedInvoiceId={selectedInvoiceId}

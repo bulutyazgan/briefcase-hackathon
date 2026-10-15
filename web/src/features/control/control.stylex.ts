@@ -1,0 +1,68 @@
+import * as stylex from '@stylexjs/stylex'
+import { tokens } from '../../tokens/tokens.stylex'
+
+export const styles = stylex.create({
+  panel: {
+    minWidth: 0,
+    backgroundColor: tokens.surface,
+    borderColor: tokens.border,
+    borderStyle: 'solid',
+    borderWidth: '1px',
+    borderRadius: tokens.radiusLarge,
+    paddingBlock: tokens.space4,
+    paddingInline: tokens.space4,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.space3,
+  },
+  header: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: tokens.space3,
+    flexWrap: 'wrap',
+  },
+  title: {
+    color: tokens.ink,
+    fontSize: tokens.textHeading,
+    fontWeight: tokens.weightBold,
+    marginBlockStart: 0,
+    marginBlockEnd: 0,
+  },
+  pill: {
+    fontSize: tokens.textSmall,
+    fontWeight: tokens.weightBold,
+    paddingBlock: tokens.space1,
+    paddingInline: tokens.space3,
+    borderRadius: tokens.radiusSmall,
+  },
+  active: { color: tokens.green, backgroundColor: tokens.greenSoft },
+  paused: { color: tokens.red, backgroundColor: tokens.redSoft },
+  row: { color: tokens.muted, fontSize: tokens.textSmall, lineHeight: tokens.textLine, marginBlockStart: 0, marginBlockEnd: 0 },
+  strong: { color: tokens.ink, fontWeight: tokens.weightMedium },
+  warning: { color: tokens.amber },
+  scopes: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: tokens.space2,
+    listStyleType: 'none',
+    paddingInlineStart: 0,
+    marginBlockStart: 0,
+    marginBlockEnd: 0,
+  },
+  scope: {
+    color: tokens.accent,
+    backgroundColor: tokens.accentSoft,
+    fontSize: tokens.textSmall,
+    paddingBlock: tokens.space1,
+    paddingInline: tokens.space2,
+    borderRadius: tokens.radiusSmall,
+  },
+  claim: {
+    color: tokens.ink,
+    fontSize: tokens.textBody,
+    lineHeight: tokens.textLine,
+    marginBlockStart: 0,
+    marginBlockEnd: 0,
+  },
+})
