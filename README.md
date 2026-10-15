@@ -19,25 +19,34 @@ A client writes "Let's kick off Q4. 300 fintech CFO leads in London, same deal a
 ```
 client message (in-app simulator or Slack Socket Mode)
   |
-  1 extract  Fireworks LLM fills a typed intent; the quote must be a verbatim substring (P1)
+  1 extract  LLM fills a typed intent (OpenAI, then Fireworks, then local rules); the quote must be a verbatim substring (P1)
   2 recall   Cognee facts for this client, else server/seed/memory.json
   3 price    code: price list x quantity - validated discount (P2, P3)
   4 decide   code: auto | needs_approval | refuse, with clause ids (P4, P5)
-  5 approve  approval card in the dashboard when P4 or P8 requires it
+  5 approve  approval card in the Inbox when P4 or P8 requires it
   6 buy      LLM proposes Treg calls; code accepts each one (P9, P10); one meter event per qualified lead
   7 bill     Stripe customer, draft invoice, invoice items attached with the 20% UK VAT tax rate, finalize (idempotency key = message id, P6)
   8 render   PDF invoice plus an evidence appendix page
   9 deliver  reply in the thread with the hosted invoice, PDF, and lead CSV; on paid, post the leads and the journal
  10 explain  "why" in the same thread: quote, memory fact, clauses, Stripe invoice id
   |
-  every step -> ledger (bun:sqlite event log) -> audit timeline in the web app
+  every step -> ledger (bun:sqlite event log) -> Audit page in the web app
 ```
+
+Extraction tries the models in this order: OpenAI (`OPENAI_API_KEY`, model `OPENAI_MODEL`, default `gpt-5-mini`), then Fireworks (`FIREWORKS_API_KEY`), then the deterministic heuristics in `agent.ts` when neither key is set or every model call fails.
 
 Policy limits apply to the net amount. The demo order is 300 leads at £4 less 10%, which is £1,080.00 net. Stripe adds £216.00 VAT, so the invoice total is £1,296.00 gross. P4 compares the £1,080.00 net with its £1,000 limit.
 
 Two more timers run in the same process. One polls open Stripe invoices every 10 seconds and delivers the lead list once Stripe reports `paid`. The other runs the collections tick every 60 seconds and sends past-due reminders under P7. A client dispute in an invoice's thread goes to `credit-notes/credit-notes.ts`, which issues a Stripe credit note under P11.
 
 The LLM extracts and explains. Code decides and executes. Prices, limits, approvals, sourcing spend, and Stripe calls never come straight from model output.
+
+## Pay an invoice
+
+Two paths pay an open invoice in test mode.
+
+- The **Pay as client (test card)** button on an invoice page calls `POST /api/invoices/:id/simulate-payment`, which attaches Stripe's `pm_card_visa` test card to the customer and pays the invoice (`billing/billing.ts`, `simulateInvoicePayment`).
+- The Northwind procurement agent in `server/src/features/buyer/` pays its own orders under `server/policy/buyer-policy.md`. `POST /api/buyer/start` posts its PO order into the simulator channel. The web app has no button for it yet.
 
 ## Autonomy with control
 
@@ -62,15 +71,15 @@ The LLM extracts and explains. Code decides and executes. Prices, limits, approv
 | `F1` | `/pause` in any channel stops sourcing and billing. Only the account owner can `/resume`. | `control/control.ts` |
 | `F2` | Tally is meant to run on a restricted test key (`rk_test_`). The scope list in `control/control.ts` is the documented least-privilege set: Customers, Invoices, Invoice items, Credit notes, and Meter events. | `control/control.ts`, `billing/billing.ts` |
 
-`billing.ts` refuses any key that does not start with `sk_test_` or `rk_test_`. Stripe enforces the F2 scopes only when you create the key as a restricted key with those scopes. A full `sk_test_` key is accepted and bills, and the **Guardrails** panel then shows the warning label "Full secret key (sk_test_) — switch to restricted". With an `rk_test_` key the panel shows "Restricted key (rk_test_)" and the scope list.
+`billing.ts` refuses any key that does not start with `sk_test_` or `rk_test_`. Stripe enforces the F2 scopes only when you create the key as a restricted key with those scopes. A full `sk_test_` key is accepted and bills. The Guardrails panel (`web/src/features/control/`) then shows the warning label "Full secret key (sk_test_) — switch to restricted". With an `rk_test_` key it shows "Restricted key (rk_test_)" and the scope list. Another agent is adding that panel to the `/app/policy` page. Until then `GET /api/control` returns the same data.
 
 ## Explains every pound
 
 - Each invoice line stores the client quote, the memory fact, and the policy clauses it used.
-- Page 2 of the PDF is an evidence appendix with that quote, fact, and clause list per line.
-- The **Invoices** panel shows the evidence for the selected invoice, with the links **Open Stripe invoice**, **View PDF**, and **Download lead list**.
-- The **Audit trail** panel lists the ledger events. The `source` event holds every Treg call, its cost, and the cap it ran under. Provider names stay in this internal log and never reach the client.
-- The **Books** panel shows double-entry journals per invoice (debtors, sales, 20% VAT, sourcing cost, margin) and exports them as CSV.
+- Page 2 of the PDF is the evidence appendix, titled "Why we billed this.", with that quote, fact, and clause list per line. `server/src/features/invoice-pdf/render.tsx` renders both pages.
+- The invoice page at `/app/invoices/:id` shows the evidence, the PDF in a frame, **Open PDF**, **Download lead list**, and **Open Stripe invoice** for the hosted page.
+- The Audit page at `/app/audit` lists the ledger events. The `source` event holds every Treg call, its cost, and the cap it ran under. Provider names stay in this internal log and never reach the client.
+- `server/src/features/books/` posts double-entry journals per invoice (debtors, sales, 20% VAT, sourcing cost, margin) and exports them as CSV. Another agent is adding the Books page at `/app/books`.
 - A message containing "why" in the invoice's thread gets a reply with the quote, the memory fact, the clauses, and the Stripe invoice id.
 
 ## How Tally maps to the judging criteria
@@ -112,11 +121,11 @@ You need [Bun](https://bun.sh) 1.3 or later.
 	bun run dev
 	```
 
-5. Open `http://localhost:5173` and send a message from the simulator, or click **Start buyer agent** to let the procurement agent order.
+5. Open `http://localhost:5173`. The landing page is at `/`. The dashboard is under `/app`, with the pages `/app/inbox` (client channel, composer, approval cards), `/app/invoices`, `/app/invoices/:id`, `/app/audit`, and `/app/policy`. Send a message from the composer on the Inbox page.
 
 Each missing key has a fallback, so the loop runs with only a Stripe key:
 
-- Without `FIREWORKS_API_KEY`, extraction, discount parsing, and the Treg proposal use local rules.
+- Without `OPENAI_API_KEY`, extraction tries Fireworks. Without `FIREWORKS_API_KEY` too, extraction, discount parsing, and the Treg proposal use local rules.
 - Without `COGNEE_API_KEY`, recall reads `server/seed/memory.json`.
 - Without `TREG_TOKEN`, sourcing uses Firecrawl if `FIRECRAWL_API_KEY` is set, else the 400 synthetic leads in `server/seed/leads.csv`.
 - Without the Slack tokens, the in-app simulator is the only channel.
@@ -147,11 +156,13 @@ Seven scripts in `server/scripts/` call the real services once the matching key 
 | `verify-meters.ts` | Creates or finds the `qualified_lead` meter and sends one meter event. | `STRIPE_SECRET_KEY=sk_test_... bun scripts/verify-meters.ts` |
 | `verify-treg.ts` | One real, cheap Treg call to `apollo.people.search`. | `TREG_TOKEN=... bun scripts/verify-treg.ts` |
 
+What is proven against the real service so far: Treg sourcing. `bun scripts/verify-treg.ts` with the team token bought 3 leads for 2,000 micro-USD through `apollo.people.search`. Stripe billing is proven against the mock harness only, not against the Stripe test API.
+
 ## Stack and sponsors
 
-- **Stripe** test mode for customers, tax rates, invoice items, invoices, credit notes, meter events, and the hosted invoice page.
+- **Stripe** test mode for customers, tax rates, invoice items, invoices, credit notes, meter events, test-card payments, and the hosted invoice page.
+- **OpenAI** (`gpt-5-mini` by default) and **Fireworks** models through the AI SDK for extraction, discount parsing, and Treg proposals.
 - **Cognee** Cloud for client memory, with one dataset per client and role-tagged facts.
-- **Fireworks** models through the AI SDK for extraction, discount parsing, and Treg proposals.
 - **Treg** (`treg.to`) as the lead supplier, with a cost on every call.
 - **Forme** (`@formepdf/react` for the document tree and `@formepdf/core` for `renderDocument`) renders the invoice PDF and its evidence appendix in `server/src/features/invoice-pdf/render.tsx`. The pdfcn invoice block from `PLAN.md` is not used.
 - Hono on Bun with `bun:sqlite` for the server. Vite, React 19, and StyleX for the web app. Slack Bolt for Socket Mode.

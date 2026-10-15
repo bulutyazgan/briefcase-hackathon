@@ -1,7 +1,7 @@
 import Stripe from 'stripe'
 import type { BillableIntent, Decision } from '../policy/decide'
 import { findClient } from '../clients/clients'
-import { getMessage, listInvoices, saveInvoice } from '../ledger/store'
+import { getInvoice, getMessage, listInvoices, saveInvoice } from '../ledger/store'
 import { extractPoNumber } from '../buyer/policy'
 import { ensureVatTaxRate } from '../books/vat-rate'
 
@@ -48,6 +48,7 @@ export async function createInvoice(
   const customer = customerMatches.data[0] ?? await stripe.customers.create({
     name: client.name,
     email,
+    metadata: { tally_client: client.name },
   }, { idempotencyKey: `customer-${messageId}` })
   const vatTaxRateId = await ensureVatTaxRate(stripe)
 
@@ -57,7 +58,8 @@ export async function createInvoice(
     customer: customer.id,
     collection_method: 'send_invoice',
     days_until_due: 7,
-    metadata: { message_id: messageId, decision_clauses: decision.clauses.join(','), ...(poNumber ? { po_number: poNumber } : {}) },
+    auto_advance: false,
+    metadata: { message_id: messageId, client: client.name, decision_clauses: decision.clauses.join(','), ...(poNumber ? { po_number: poNumber } : {}) },
     ...(poNumber ? { description: `Purchase order ${poNumber}` } : {}),
   }, { idempotencyKey: `invoice-${messageId}` })
   await Promise.all(decision.lines.map((line, index) => stripe.invoiceItems.create({
@@ -89,6 +91,19 @@ export async function createInvoice(
     pdf_path: null,
   })
   return { stripeInvoiceId: finalized.id, hostedUrl }
+}
+
+export async function simulateInvoicePayment(invoiceId: string): Promise<void> {
+  const invoice = getInvoice(invoiceId)
+  if (!invoice?.stripe_invoice_id || !invoice.client_id || invoice.status !== 'open') {
+    throw new Error('Only an open Stripe invoice can use the test-card payment.')
+  }
+
+  const stripe = getStripe()
+  const testCard = await stripe.paymentMethods.attach('pm_card_visa', { customer: invoice.client_id })
+  await stripe.invoices.pay(invoice.stripe_invoice_id, {
+    payment_method: testCard.id,
+  }, { idempotencyKey: `simulate-payment-${invoice.id}` })
 }
 
 export async function readStripeInvoiceStatus(stripeInvoiceId: string): Promise<string> {

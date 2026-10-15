@@ -8,7 +8,7 @@ export const styles = stylex.create({
     borderColor: tokens.border,
     borderStyle: 'solid',
     borderWidth: '1px',
-    borderRadius: tokens.radiusLarge,
+    borderRadius: tokens.radiusMedium,
     overflow: 'hidden',
   },
   header: {
@@ -29,25 +29,30 @@ export const styles = stylex.create({
   timeline: {
     display: 'flex',
     flexDirection: 'column',
-    maxHeight: { default: '460px', '@media (max-width: 700px)': '380px' },
+    maxHeight: 'calc(100vh - 260px)',
     overflowY: 'auto',
     paddingBlock: tokens.space2,
     paddingInline: tokens.space4,
   },
   event: {
     display: 'grid',
-    gridTemplateColumns: 'minmax(62px, 0.3fr) minmax(0, 1fr)',
+    gridTemplateColumns: 'minmax(120px, 0.3fr) minmax(0, 1fr)',
     gap: tokens.space3,
     paddingBlock: tokens.space3,
     borderBottomColor: tokens.border,
     borderBottomStyle: 'solid',
     borderBottomWidth: '1px',
   },
-  time: { color: tokens.muted, fontSize: tokens.textSmall },
+  time: {
+    color: tokens.muted,
+    fontFamily: tokens.fontMono,
+    fontSize: '11px',
+    lineHeight: tokens.textLine,
+  },
   name: {
     color: tokens.ink,
     fontSize: tokens.textBody,
-    fontWeight: tokens.weightBold,
+    fontWeight: tokens.weightMedium,
     textTransform: 'capitalize',
   },
   summary: {

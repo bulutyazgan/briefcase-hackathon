@@ -73,7 +73,7 @@ export function decide(
   if (discountTerms) clauses.push('P3')
   const clausesForLine = [...clauses, 'P4']
   const lines: PricedLine[] = [{
-    description: `Leads: ${intent.icp}`,
+    description: `${intent.icp.trim() || intent.ask.trim()}`,
     quantity,
     unitPricePence: price.unitPricePence,
     totalPence: price.netPence,

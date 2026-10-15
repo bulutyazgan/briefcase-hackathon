@@ -5,7 +5,7 @@ description: A named-diagnostics checklist derived from Ousterhout's *A Philosop
 
 Complexity is what a reader experiences in the moment. It is not a function of size or feature count. It accumulates from many small decisions, and each decision is defensible alone. Two counters exist: **eliminate** (simplify) and **encapsulate** (deep modules, information hiding). Every diagnostic below comes from those two.
 
-Name the flag out loud in review or in a design doc. The name is half the diagnosis. cf0 bans comments in source (`no-comments` in `base.rules.yaml`, zero tolerance). When a diagnostic below points at "write a comment", the cf0 fix is different. Put the information in a name, a type, a narrowing guard, or the feature's `feature-map.md`. See Comments, below.
+Name the flag out loud in review or in a design doc. The name is half the diagnosis. Comments should add useful context rather than repeat code. When a diagnostic below points at "write a comment", first check whether the information belongs in a name, a type, a narrowing guard, or the feature's existing documentation. See Comments, below.
 
 ## The 14 red flags
 
@@ -19,7 +19,7 @@ Name the flag out loud in review or in a design doc. The name is half the diagno
 | 6 | **Repetition** | Non-trivial code occurs more than once. An abstraction is missing. |
 | 7 | **Special-General Mixture** | Special-purpose code sits inside a general-purpose mechanism and leaks the use case into it. |
 | 8 | **Conjoined Methods** | Two methods that you cannot understand without reading both. |
-| 9 | **Comment Repeats Code** | A comment that a reader could write without understanding the code. It often reuses the name of the entity. In cf0 this means that the name does too little work. |
+| 9 | **Comment Repeats Code** | A comment that a reader could write without understanding the code. It often reuses the name of the entity, which means the name does too little work. |
 | 10 | **Implementation Contaminates Interface** | The interface description tells how, not what. It leaks internal data structures, RPC names or private constants. |
 | 11 | **Vague Name** | `count`, `result`, `time`, `data`. Each is broad enough to mean many things. |
 | 12 | **Hard to Pick Name** | If you cannot name it cleanly, the concept is muddled. Often it is two things in one. |
@@ -73,12 +73,12 @@ The same logic applies to special cases in general. Design them out. Do not bran
 
 ## Comments
 
-Here, Ousterhout's comment advice is a design test, not something to write. cf0 bans comments in source. When a diagnostic above points at a comment, apply these rules:
+Here, Ousterhout's comment advice is a design test, not a reason to add comments by default. Follow repository guidance for comments. When a diagnostic above points at a comment, apply these rules:
 
-- **Hard to Describe** (the master diagnostic) still applies. If you cannot state the interface of a module in one complete, simple sentence, the design is bad. Write that sentence while you design. Then put what it says into a name, a type, or the feature's `feature-map.md`. Never put it into a comment.
+- **Hard to Describe** (the master diagnostic) still applies. If you cannot state the interface of a module in one complete, simple sentence, the design is bad. Write that sentence while you design. Then put what it says into a name, a type, or the feature's documentation.
 - **Precision** (units, boundary inclusivity, null semantics, invariants) belongs in branded types, literal unions, and narrowing guards that the compiler checks.
 - **Intuition** belongs in names and structure. If a block needs a sentence before a reader understands it, extract it into a function. The name of that function is the sentence.
-- Durable decisions go in `docs/decisions/`. Product knowledge goes in the feature's `feature-map.md`. Neither belongs in a commit message or a comment.
+- Durable decisions go in the project's decision documentation. Product knowledge goes in the feature's documentation. Neither belongs only in a commit message or a comment.
 
 ## Names
 
@@ -139,5 +139,5 @@ Clean code is usually faster. Deep modules mean fewer layer crossings. When you 
 6. Do exceptions earn their keep? Or can you redefine the operation so that there is no error to throw?
 7. Does a configuration parameter push away a decision that the code can make itself?
 8. Are names precise and consistent? Does any name do two jobs?
-9. Can only a comment explain something? Move it into a name, a type, or a `base.rules.yaml` rule.
+9. Can only a comment explain something? Move it into a name, a type, or a mechanical repository check.
 10. Did the change leave the design as good as it would be with the new requirement known from the start?
