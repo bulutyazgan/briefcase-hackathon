@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import * as stylex from '@stylexjs/stylex'
-import type { AppState, ChannelMessage } from '../../api'
+import type { AppState, ApprovalRow, ChannelMessage } from '../../api'
 import { decideApproval, sendMessage } from './api'
 import { styles } from './inbox.stylex'
 
@@ -18,7 +18,7 @@ function Message({ message }: { message: ChannelMessage }) {
     <article {...stylex.props(styles.message, message.author === 'tally' && styles.tallyMessage)}>
       <div {...stylex.props(styles.messageMeta)}>
         <strong>{message.author}</strong>
-        <time dateTime={message.ts}>{displayTime(message.ts)}</time>
+        <time dateTime={message.ts} {...stylex.props(styles.timestamp)}>{displayTime(message.ts)}</time>
       </div>
       <p {...stylex.props(styles.messageText)}>{message.text}</p>
     </article>
@@ -30,11 +30,9 @@ export function Inbox({ state, onRefresh }: InboxProps) {
   const [text, setText] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
-  const [approvalBusy, setApprovalBusy] = useState('')
   const messages = [...state.messages]
     .filter((message) => message.channel === 'simulator')
     .sort((first, second) => first.ts.localeCompare(second.ts))
-  const pendingApprovals = state.approvals.filter((approval) => approval.status === 'pending')
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -52,19 +50,6 @@ export function Inbox({ state, onRefresh }: InboxProps) {
     }
   }
 
-  async function approve(messageId: string, action: 'approve' | 'reject') {
-    setApprovalBusy(messageId)
-    setError('')
-    try {
-      await decideApproval(messageId, action)
-      onRefresh()
-    } catch (approvalError) {
-      setError(String(approvalError))
-    } finally {
-      setApprovalBusy('')
-    }
-  }
-
   return (
     <section {...stylex.props(styles.panel)} aria-labelledby="inbox-title">
       <header {...stylex.props(styles.header)}>
@@ -72,36 +57,15 @@ export function Inbox({ state, onRefresh }: InboxProps) {
           <h2 id="inbox-title" {...stylex.props(styles.title)}>Client channel</h2>
           <p {...stylex.props(styles.caption)}>Simulator · Northwind Capital</p>
         </div>
-        <span aria-label="Agent status">● Live</span>
+        <span aria-label="Agent status" {...stylex.props(styles.live)}>
+          <span aria-hidden="true" {...stylex.props(styles.liveDot)} />
+          Live
+        </span>
       </header>
       <div {...stylex.props(styles.feed)} aria-live="polite">
         {messages.length
           ? messages.map((message) => <Message key={message.id} message={message} />)
           : <p {...stylex.props(styles.empty)}>No messages yet. Send a client commitment to start the audit trail.</p>}
-        {pendingApprovals.map((approval) => (
-          <section key={approval.id} {...stylex.props(styles.approval)} aria-label="Invoice approval">
-            <strong {...stylex.props(styles.approvalTitle)}>Approval needed</strong>
-            <span>{approval.reason}</span>
-            <div {...stylex.props(styles.approvalActions)}>
-              <button
-                type="button"
-                {...stylex.props(styles.approve)}
-                disabled={approvalBusy === approval.message_id}
-                onClick={() => void approve(approval.message_id, 'approve')}
-              >
-                Approve invoice
-              </button>
-              <button
-                type="button"
-                {...stylex.props(styles.reject)}
-                disabled={approvalBusy === approval.message_id}
-                onClick={() => void approve(approval.message_id, 'reject')}
-              >
-                Reject
-              </button>
-            </div>
-          </section>
-        ))}
       </div>
       <form {...stylex.props(styles.composer)} onSubmit={submit}>
         <select
@@ -127,6 +91,88 @@ export function Inbox({ state, onRefresh }: InboxProps) {
         </button>
         {error && <p role="alert" {...stylex.props(styles.error)}>{error}</p>}
       </form>
+    </section>
+  )
+}
+
+function ApprovalCard({
+  approval,
+  busy,
+  onDecide,
+}: {
+  approval: ApprovalRow
+  busy: boolean
+  onDecide: (messageId: string, action: 'approve' | 'reject') => void
+}) {
+  return (
+    <article {...stylex.props(styles.approval)}>
+      <div {...stylex.props(styles.approvalTopline)}>
+        <strong {...stylex.props(styles.approvalTitle)}>Approval needed</strong>
+        <span {...stylex.props(styles.approvalId)}>{approval.message_id.slice(0, 8)}</span>
+      </div>
+      <p {...stylex.props(styles.approvalReason)}>{approval.reason}</p>
+      <div {...stylex.props(styles.approvalActions)}>
+        <button
+          type="button"
+          {...stylex.props(styles.approve)}
+          disabled={busy}
+          onClick={() => onDecide(approval.message_id, 'approve')}
+        >
+          Approve invoice
+        </button>
+        <button
+          type="button"
+          {...stylex.props(styles.reject)}
+          disabled={busy}
+          onClick={() => onDecide(approval.message_id, 'reject')}
+        >
+          Reject
+        </button>
+      </div>
+    </article>
+  )
+}
+
+export function PendingApprovals({ state, onRefresh }: InboxProps) {
+  const [approvalBusy, setApprovalBusy] = useState('')
+  const [error, setError] = useState('')
+  const pendingApprovals = state.approvals.filter((approval) => approval.status === 'pending')
+
+  async function decide(messageId: string, action: 'approve' | 'reject'): Promise<void> {
+    setApprovalBusy(messageId)
+    setError('')
+    try {
+      await decideApproval(messageId, action)
+      onRefresh()
+    } catch (approvalError) {
+      setError(String(approvalError))
+    } finally {
+      setApprovalBusy('')
+    }
+  }
+
+  return (
+    <section {...stylex.props(styles.approvalPanel)} aria-labelledby="pending-approvals-title">
+      <header {...stylex.props(styles.approvalHeader)}>
+        <div>
+          <h2 id="pending-approvals-title" {...stylex.props(styles.title)}>Pending approvals</h2>
+          <p {...stylex.props(styles.caption)}>Review before billing</p>
+        </div>
+        <span {...stylex.props(styles.approvalCount)}>{pendingApprovals.length}</span>
+      </header>
+      <div {...stylex.props(styles.approvalList)}>
+        {pendingApprovals.length
+          ? pendingApprovals.map((approval) => (
+            <ApprovalCard
+              key={approval.id}
+              approval={approval}
+              busy={approvalBusy === approval.message_id}
+              onDecide={(messageId, action) => void decide(messageId, action)}
+            />
+          ))
+          : <p {...stylex.props(styles.emptyApproval)}>No approvals are waiting. New requests will appear here.</p>}
+        {error && <p role="alert" {...stylex.props(styles.error)}>{error}</p>}
+      </div>
     </section>
   )
 }

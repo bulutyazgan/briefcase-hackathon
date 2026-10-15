@@ -1,4 +1,5 @@
-import { readFile } from 'node:fs/promises'
+import { realpath, stat } from 'node:fs/promises'
+import { isAbsolute, relative, resolve, sep } from 'node:path'
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { channelRoutes } from './features/channels/routes'
@@ -13,6 +14,26 @@ const leadsSchema = z.array(z.object({
   company: z.string(),
   url: z.string(),
 }))
+
+const invoicePdfDirectory = resolve(import.meta.dir, '../out')
+
+async function resolveInvoicePdfPath(filePath: string): Promise<string | null> {
+  try {
+    const directory = await realpath(invoicePdfDirectory)
+    const resolvedPath = await realpath(filePath)
+    const pathFromDirectory = relative(directory, resolvedPath)
+    if (
+      pathFromDirectory === ''
+      || pathFromDirectory === '..'
+      || pathFromDirectory.startsWith(`..${sep}`)
+      || isAbsolute(pathFromDirectory)
+      || !(await stat(resolvedPath)).isFile()
+    ) return null
+    return resolvedPath
+  } catch {
+    return null
+  }
+}
 
 const app = new Hono()
 
@@ -62,13 +83,14 @@ app.get('/api/leads/:invoiceId.csv', (context) => {
 })
 
 app.get('/api/invoices/:id/pdf', async (context) => {
-  const invoice = getInvoice(context.req.param('id'))
-  if (!invoice?.pdf_path || !(await Bun.file(invoice.pdf_path).exists())) {
-    return context.text('Invoice PDF not found.', 404)
-  }
-  return context.body(await readFile(invoice.pdf_path), 200, {
+  const invoiceId = context.req.param('id')
+  const invoice = getInvoice(invoiceId)
+  const storedPdfPath = invoice?.pdf_path
+  const pdfPath = storedPdfPath ? await resolveInvoicePdfPath(storedPdfPath) : null
+  if (!pdfPath) return context.text('Invoice PDF not found.', 404)
+  return context.body(Bun.file(pdfPath), 200, {
     'content-type': 'application/pdf',
-    'content-disposition': `inline; filename="tally-${invoice.id}.pdf"`,
+    'content-disposition': `inline; filename="tally-${invoiceId}.pdf"`,
   })
 })
 

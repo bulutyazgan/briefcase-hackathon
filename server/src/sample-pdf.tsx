@@ -26,7 +26,24 @@ recordEvent({
   message_id: sampleId,
   step: 'decide',
   summary: 'Sample decision evidence for PDF rendering.',
-  data_json: JSON.stringify({ policy_clause: ['P1', 'P2', 'P3', 'P4'] }) ?? 'null',
+  data_json: JSON.stringify({
+    intent: { clientName: 'Northwind Capital' },
+    decision: {
+      outcome: 'needs_approval',
+      clauses: ['P1', 'P2', 'P3', 'P4'],
+      totalPence: 108000,
+      reason: 'The sample amount exceeds the auto-send limit.',
+      lines: [{
+        description: 'Fintech CFO leads in London (300 sourced)',
+        quantity: 300,
+        unitPricePence: 400,
+        totalPence: 108000,
+        quote: "Let's kick off Q4. 300 fintech CFO leads in London, same deal as last time.",
+        memoryFact: '2026-08-12: agreed 10% off orders over 200 leads',
+        clauses: ['P1', 'P2', 'P3', 'P4'],
+      }],
+    },
+  }),
   policy_clause: 'P1,P2,P3,P4',
 })
 const outputPath = await renderInvoicePdf({
