@@ -87,8 +87,8 @@ export interface OpportunityDeps {
   recentNeedMessages(): ChannelMessage[]
   extractNeed(message: ChannelMessage): Promise<NeedExtraction>
   markChecked(message: ChannelMessage, need: NeedExtraction): void
-  // null means the signal source is off (no token) or capped for today.
-  countFundedAccounts(client: Client, icp: string, now: Date): Promise<{ count: number; accountIds: string[] } | null>
+  // null means the signal source is off (no token, no saved account ids) or already called today.
+  countFundedAccounts(client: Client, facts: RoleFact[], now: Date): Promise<{ count: number; accountIds: string[] } | null>
   post(opportunity: Opportunity, text: string): Promise<string>
   requestApproval(opportunity: Opportunity, reason: string): void
 }
@@ -229,19 +229,27 @@ function recentNeedMessages(): ChannelMessage[] {
 }
 
 const signalCalls = new Map<string, string>()
+const ACCOUNT_IDS_PATTERN = /target account ids?:\s*([\w, -]+)/i
 
-async function countFundedAccounts(client: Client, icp: string, now: Date): Promise<{ count: number; accountIds: string[] } | null> {
+// The client's saved target accounts, as a remembered fact "Target account ids: <id>, <id>".
+export function savedAccountIds(facts: RoleFact[]): string[] {
+  const match = facts.map((entry) => entry.fact.match(ACCOUNT_IDS_PATTERN)).find(Boolean)
+  return match?.[1] ? match[1].split(/[\s,]+/).filter(Boolean) : []
+}
+
+async function countFundedAccounts(client: Client, facts: RoleFact[], now: Date): Promise<{ count: number; accountIds: string[] } | null> {
   const token = process.env.TREG_TOKEN
-  if (!token) return null
+  const ids = savedAccountIds(facts)
+  if (!token || !ids.length) return null
   const today = now.toISOString().slice(0, 10)
   if (signalCalls.get(client.name) === today) return null
   signalCalls.set(client.name, today)
   const since = new Date(now.getTime() - 30 * 86400000).toISOString().slice(0, 10)
   const result = await createTregClient({ token }).call('apollo.companies.news', {
+    'organization_ids[]': ids,
     'categories[]': ['receives_financing'],
     'published_at[min]': since,
     per_page: 10,
-    q_organization_keyword_tags: icp,
   }, SIGNAL_CALL_CAP_MICRO)
   const body = z.object({ news_articles: z.array(z.object({ organization_ids: z.array(z.string()).default([]) })) }).safeParse(result.body)
   if (!body.success) return { count: 0, accountIds: [] }
@@ -369,6 +377,16 @@ function spotChannel(client: Client, facts: RoleFact[], message: ChannelMessage,
   }, now)
 }
 
+// The same delivery date spots one cadence opportunity: not again while it is open or accepted, nor during its cooldown.
+export function cadenceAlreadySpotted(existing: Opportunity[], candidate: Opportunity, now: Date): boolean {
+  if (candidate.evidence.kind !== 'cadence') return false
+  const lastDelivered = candidate.evidence.lastDelivered
+  return existing.some((entry) => entry.clientName === candidate.clientName
+    && entry.evidence.kind === 'cadence' && entry.evidence.lastDelivered === lastDelivered
+    && (isOpen(entry) || entry.status === 'accepted'
+      || (entry.closedAt !== null && now.getTime() - Date.parse(entry.closedAt) < COOLDOWN_MS)))
+}
+
 // O3: one open offer per client, 7-day cooldown after a decline or expiry, never while a dispute is remembered.
 export function gateO3(candidate: Opportunity, existing: Opportunity[], facts: RoleFact[], now: Date): string | null {
   const mine = existing.filter((entry) => entry.clientName === candidate.clientName && entry.id !== candidate.id)
@@ -435,9 +453,7 @@ export async function runOpportunityTick(now: Date, overrides: Partial<Opportuni
     const candidates: Opportunity[] = []
 
     const cadence = spotCadence(client, facts, now)
-    if (cadence && !existing.some((entry) => entry.clientName === client.name && entry.evidence.kind === 'cadence' && isOpen(entry))) {
-      candidates.push(cadence)
-    }
+    if (cadence && !cadenceAlreadySpotted(existing, cadence, now)) candidates.push(cadence)
 
     for (const message of needMessages) {
       if (findClient(message.author)?.name !== client.name) continue
@@ -450,7 +466,7 @@ export async function runOpportunityTick(now: Date, overrides: Partial<Opportuni
 
     if (!existing.some((entry) => entry.clientName === client.name && entry.evidence.kind === 'signal' && isOpen(entry))) {
       try {
-        const funded = await deps.countFundedAccounts(client, savedIcp(facts), now)
+        const funded = await deps.countFundedAccounts(client, facts, now)
         if (funded && funded.count > 0) {
           candidates.push(newOpportunity(client, facts, savedQuantity(facts) ?? 100, `${funded.count} of your target accounts raised this month`, {
             kind: 'signal', accountIds: funded.accountIds, count: funded.count,

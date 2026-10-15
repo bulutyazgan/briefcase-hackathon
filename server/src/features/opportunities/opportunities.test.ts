@@ -62,6 +62,27 @@ describe('cadence spotter', () => {
   })
 })
 
+describe('cadence dedupe', () => {
+  test('does not spot the same delivery date again after acceptance or during cooldown', async () => {
+    const now = new Date('2026-10-15T00:00:00Z')
+    const first = await (async () => {
+      const { deps, saved } = harness([cadenceFact, icpFact])
+      await runOpportunityTick(now, deps)
+      return saved[saved.length - 1]
+    })()
+    if (!first) throw new Error('expected a spotted opportunity')
+    const accepted = { ...first, status: 'accepted' as const, closedAt: now.toISOString() }
+    const acceptedRun = harness([cadenceFact, icpFact], [accepted])
+    expect(await runOpportunityTick(now, acceptedRun.deps)).toEqual([])
+    const declined = { ...first, status: 'declined' as const, closedAt: now.toISOString() }
+    const cooldownRun = harness([cadenceFact, icpFact], [declined])
+    expect(await runOpportunityTick(new Date('2026-10-18T00:00:00Z'), cooldownRun.deps)).toEqual([])
+    const afterCooldown = harness([cadenceFact, icpFact], [declined])
+    const outcomes = await runOpportunityTick(new Date('2026-10-23T00:00:00Z'), afterCooldown.deps)
+    expect(outcomes.map((entry) => entry.action)).toEqual(['spotted', 'offered'])
+  })
+})
+
 describe('O2 auto-offer limit', () => {
   test('posts an offer at or under £1,000 and records the gate', async () => {
     const { deps, posted, gates, approvals } = harness([cadenceFact, icpFact])
