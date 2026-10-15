@@ -21,6 +21,7 @@ import type { BillableIntent } from '../policy/decide'
 import { regexDiscountTerms, validateDiscount } from '../pricing/discount'
 import { priceOrder } from '../pricing/pricing'
 import { createTregClient } from '../leads/providers/treg/treg-client'
+import { noteToStaff } from '../staff/staff'
 
 // Opportunities: code spots revenue (cadence, channel need, buying signal), policy gates the offer,
 // and the client's explicit acceptance in the same thread hands the order to the commitment path.
@@ -431,6 +432,7 @@ async function postOffer(opportunity: Opportunity, now: Date, deps: OpportunityD
   const posted = { ...offered, thread }
   deps.save(posted)
   recordStep(posted.id, OFFER_STEP, `Posted offer ${posted.id} to ${posted.clientName} for ${money(posted.pricePence)}.`, { ...posted, text: offerText(posted) }, posted.clauses)
+  void noteToStaff(posted.id, 'offer', `Offered ${posted.clientName} ${money(posted.pricePence)} of leads (offer ${posted.id}); it bills only on an explicit acceptance. No action needed.`, posted.clauses)
   return posted
 }
 

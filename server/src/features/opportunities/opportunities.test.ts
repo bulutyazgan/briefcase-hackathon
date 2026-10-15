@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import type { ChannelMessage } from '../ledger/store'
 import type { RoleFact } from '../memory/memory'
 import type { BillableIntent } from '../policy/decide'
-import { CLIENTS } from '../clients/clients'
+import { CLIENTS, findClient } from '../clients/clients'
 import {
   gateO3,
   handleOfferAcceptance,
@@ -12,7 +12,7 @@ import {
   type OpportunityDeps,
 } from './opportunities'
 
-const northwind = CLIENTS[0]
+const northwind = findClient('Northwind Capital') ?? CLIENTS[0]
 
 function fact(text: string, role: RoleFact['role'] = 'sales', date = '2026-07-14'): RoleFact {
   return { clientName: 'Northwind Capital', fact: text, role, date, sourceMessageId: `src-${text.length}` }

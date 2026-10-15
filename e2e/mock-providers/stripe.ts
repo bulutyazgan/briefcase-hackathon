@@ -34,12 +34,46 @@ interface Invoice {
   hosted_invoice_url: string | null
   created: number
 }
-type StoredObject = Customer | InvoiceItem | Invoice | Record<string, unknown>
+interface Price {
+  id: string
+  object: 'price'
+  product: string
+  currency: string
+  unit_amount: number
+  recurring: { interval: string; interval_count: number } | null
+  nickname: string | null
+  active: boolean
+  metadata: Record<string, string>
+  created: number
+}
+interface SubscriptionItem {
+  id: string
+  object: 'subscription_item'
+  price: Price
+  quantity: number
+  current_period_start: number
+  current_period_end: number
+}
+interface Subscription {
+  id: string
+  object: 'subscription'
+  customer: string
+  status: 'active'
+  collection_method: string
+  days_until_due: number | null
+  metadata: Record<string, string>
+  items: { object: 'list'; data: SubscriptionItem[] }
+  proration_behavior: string | null
+  created: number
+}
+type StoredObject = Customer | InvoiceItem | Invoice | Price | Subscription | Record<string, unknown>
 
 const state = {
   customers: new Map<string, Customer>(),
   items: new Map<string, InvoiceItem>(),
   invoices: new Map<string, Invoice>(),
+  prices: new Map<string, Price>(),
+  subscriptions: new Map<string, Subscription>(),
   other: new Map<string, Record<string, unknown>>(),
   idempotency: new Map<string, StoredObject>(),
   counter: 0,
@@ -49,6 +83,8 @@ export function resetStripe(): void {
   state.customers.clear()
   state.items.clear()
   state.invoices.clear()
+  state.prices.clear()
+  state.subscriptions.clear()
   state.other.clear()
   state.idempotency.clear()
   state.counter = 0
@@ -59,7 +95,14 @@ export function stripeInvoices(): Invoice[] {
 }
 
 export function stripeObjects(): StoredObject[] {
-  return [...state.customers.values(), ...state.items.values(), ...state.other.values()]
+  return [...state.customers.values(), ...state.items.values(), ...state.prices.values(), ...state.subscriptions.values(), ...state.other.values()]
+}
+
+// A new period starts at the change, as Stripe does when an item's price changes with prorations.
+function subscriptionItem(price: Price): SubscriptionItem {
+  const start = now()
+  const days = price.recurring?.interval === 'year' ? 365 : 30
+  return { id: newId('si'), object: 'subscription_item', price, quantity: 1, current_period_start: start, current_period_end: start + days * 86400 }
 }
 
 function newId(prefix: string): string {
@@ -372,6 +415,94 @@ export async function handleStripe(request: Request, url: URL, mockBase: string)
     }
     state.other.set(creditNote.id, creditNote)
     return remember(creditNote)
+  }
+  if (path === '/v1/products' && !post) return json(list(listOther('prod', fields), '/v1/products'))
+  if (path === '/v1/products' && post) {
+    const product = {
+      id: newId('prod'),
+      object: 'product',
+      name: fields.name ?? '',
+      active: fields.active !== 'false',
+      metadata: metadataFrom(fields),
+      created: now(),
+    }
+    state.other.set(product.id, product)
+    return remember(product)
+  }
+  if (path === '/v1/prices' && !post) {
+    const data = [...state.prices.values()].filter((price) =>
+      (!fields.product || price.product === fields.product)
+      && (fields.active === undefined || String(price.active) === fields.active))
+    return json(list(data, '/v1/prices'))
+  }
+  if (path === '/v1/prices' && post) {
+    const product = fields.product ?? ''
+    if (!state.other.has(product)) return stripeError(400, 'invalid_request_error', `No such product: '${product}'`, 'resource_missing')
+    const interval = fields['recurring[interval]']
+    const price: Price = {
+      id: newId('price'),
+      object: 'price',
+      product,
+      currency: fields.currency ?? 'gbp',
+      unit_amount: Number(fields.unit_amount ?? 0),
+      recurring: interval ? { interval, interval_count: Number(fields['recurring[interval_count]'] ?? 1) } : null,
+      nickname: fields.nickname ?? null,
+      active: true,
+      metadata: metadataFrom(fields),
+      created: now(),
+    }
+    state.prices.set(price.id, price)
+    return remember(price)
+  }
+  if (path === '/v1/subscriptions' && !post) {
+    const data = [...state.subscriptions.values()].filter((subscription) =>
+      (!fields.customer || subscription.customer === fields.customer)
+      && (!fields.status || fields.status === 'all' || subscription.status === fields.status))
+    return json(list(data, '/v1/subscriptions'))
+  }
+  if (path === '/v1/subscriptions' && post) {
+    const customer = fields.customer ?? ''
+    if (!state.customers.has(customer)) return stripeError(400, 'invalid_request_error', `No such customer: '${customer}'`, 'resource_missing')
+    const priceId = fields['items[0][price]'] ?? ''
+    const price = state.prices.get(priceId)
+    if (!price) return stripeError(400, 'invalid_request_error', `No such price: '${priceId}'`, 'resource_missing')
+    const subscription: Subscription = {
+      id: newId('sub'),
+      object: 'subscription',
+      customer,
+      status: 'active',
+      collection_method: fields.collection_method ?? 'charge_automatically',
+      days_until_due: fields.days_until_due ? Number(fields.days_until_due) : null,
+      metadata: metadataFrom(fields),
+      items: { object: 'list', data: [subscriptionItem(price)] },
+      proration_behavior: null,
+      created: now(),
+    }
+    state.subscriptions.set(subscription.id, subscription)
+    return remember(subscription)
+  }
+  if ((match = path.match(/^\/v1\/subscriptions\/([^/]+)$/)) && !post) {
+    const subscription = state.subscriptions.get(match[1] ?? '')
+    if (!subscription) return stripeError(404, 'invalid_request_error', 'No such subscription', 'resource_missing')
+    return json(subscription)
+  }
+  if ((match = path.match(/^\/v1\/subscriptions\/([^/]+)$/)) && post) {
+    const subscription = state.subscriptions.get(match[1] ?? '')
+    if (!subscription) return stripeError(404, 'invalid_request_error', 'No such subscription', 'resource_missing')
+    const itemId = fields['items[0][id]']
+    const priceId = fields['items[0][price]']
+    if (itemId && priceId) {
+      const price = state.prices.get(priceId)
+      if (!price) return stripeError(400, 'invalid_request_error', `No such price: '${priceId}'`, 'resource_missing')
+      const index = subscription.items.data.findIndex((item) => item.id === itemId)
+      if (index === -1) return stripeError(400, 'invalid_request_error', `No such subscription item: '${itemId}'`, 'resource_missing')
+      subscription.items.data[index] = { ...subscriptionItem(price), id: itemId }
+    }
+    if (fields.collection_method) subscription.collection_method = fields.collection_method
+    if (fields.days_until_due) subscription.days_until_due = Number(fields.days_until_due)
+    subscription.metadata = { ...subscription.metadata, ...metadataFrom(fields) }
+    subscription.proration_behavior = fields.proration_behavior ?? subscription.proration_behavior
+    return remember(subscription)
   }
   return stripeError(404, 'invalid_request_error', `Unrecognized request URL (${request.method}: ${path}).`)
 }

@@ -27,7 +27,7 @@ import { withFallback } from '../leads/fallback-sourcer'
 import { tregSourcer } from '../leads/providers/treg/treg-sourcer'
 import type { Sourcer } from '../leads/sourcing'
 import { findClient } from '../clients/clients'
-import { decide, type BillableIntent, type Decision, type MemoryFact } from '../policy/decide'
+import { AUTO_SEND_LIMIT_PENCE, decide, type BillableIntent, type Decision, type MemoryFact } from '../policy/decide'
 import { discountTermsSchema, extractDiscountTerms, type DiscountTerms } from '../pricing/discount'
 import { settleOrder } from '../pricing/order'
 import { sourcingCapMicro } from '../pricing/pricing'
@@ -38,7 +38,9 @@ import { meterQualifiedLeads, recordLeadQualification } from '../meters/meters'
 import { handleCreditNoteApproval, handleDispute } from '../credit-notes/credit-notes'
 import { offerUpsellToAgentBuyer } from '../buyer/upsell'
 import { handleOfferAcceptance, handleOfferApproval, runOpportunityTick } from '../opportunities/opportunities'
+import { gateFirstInvoice, handleIntake, identifyClient, onboardClient } from '../intake/intake'
 import { converse, wantsPlanChange } from '../concierge/concierge'
+import { money as staffMoney, noteToStaff } from '../staff/staff'
 
 const intentSchema = z.object({
   isCommitment: z.boolean(),
@@ -215,6 +217,7 @@ async function continueBilling(message: ChannelMessage, saved: SavedDecision): P
       totalPence: decision.totalPence,
       idempotencyKey: message.id,
     }, decision.clauses)
+    void noteToStaff(message.id, 'invoice', `Invoiced ${intent.clientName} ${staffMoney(decision.totalPence)} for ${leads.length} leads (invoice ${result.stripeInvoiceId}), sent to ${findClient(intent.clientName)?.billingEmail ?? 'the client'}. No action needed.`, decision.clauses)
     // Metering is audit, not the money path: never hold the invoice reply on hundreds of meter calls.
     void meterQualifiedLeads(message.id)
     syncBooks()
@@ -287,6 +290,7 @@ async function requestApproval(
 ): Promise<void> {
   saveApproval({ id: message.id, message_id: message.id, status: 'pending', reason })
   recordStep(message.id, 'approval', 'Requested account-owner approval.', { amount, reason, clauses }, clauses)
+  void noteToStaff(message.id, 'approval', `Approval needed from the account owner: ${amount} invoice for ${findClient(message.author)?.name ?? message.author}. ${reason}`, clauses)
   await reply(message, `Approval required for ${amount}. ${reason} Approve here or in Tally.`, [], { approvalFor: message.id })
 }
 
@@ -349,6 +353,8 @@ async function processMessage(message: ChannelMessage): Promise<void> {
     if (/\bwhy\b/i.test(message.text) && await explainLatestInvoice(message)) return
     if (await handleDispute(message)) return
     if (await handleOfferAcceptance(message, billCommitment)) return
+    // P12: an unknown sender's question is answered from the company knowledge base before P5 can refuse it.
+    if (await handleIntake(message)) return
     if (wantsPlanChange(message.text)) {
       await converse(message)
       markMessageProcessed(message.id)
@@ -366,10 +372,15 @@ async function processMessage(message: ChannelMessage): Promise<void> {
     }
     const intent = extracted.intent
     // P5: the sender identifies the client; the extracted name is only a fallback.
-    const knownClient = findClient(message.author) ?? findClient(await canonicalClientName(intent.clientName))
+    const knownClient = identifyClient(message, await canonicalClientName(intent.clientName))
     intent.clientName = knownClient?.name ?? intent.clientName
     const quoteValid = intent.quote.length > 0 && message.text.includes(intent.quote)
     if (!quoteValid) intent.isCommitment = false
+    // P12: a sender who inquired earlier in this thread and now commits is onboarded, then billed as usual.
+    if (intent.isCommitment && !knownClient) {
+      const onboarded = await onboardClient(message, intent)
+      if (onboarded) intent.clientName = onboarded.name
+    }
     recordStep(message.id, 'extract', quoteValid ? 'Extracted a commitment and validated its verbatim quote.' : 'No valid source quote was found.', {
       ...intent,
       quoteValid,
@@ -411,8 +422,8 @@ async function billCommitment(message: ChannelMessage, intent: BillableIntent): 
       : 'No remembered discount was extracted.', { terms: discount.terms, model: discount.model }, ['P3'])
 
     const requestedQuantity = intent.quantity ?? 0
-    const decision = decide(intent, facts, requestedQuantity, discount.terms)
     const client = findClient(intent.clientName)
+    const decision = gateFirstInvoice(client, decide(intent, facts, requestedQuantity, discount.terms))
     recordStep(message.id, 'price', client
       ? `Priced ${requestedQuantity} leads at £${(client.pricePerLeadPence / 100).toFixed(2)} per lead.`
       : 'Could not price: unknown client.', {
@@ -438,8 +449,10 @@ async function billCommitment(message: ChannelMessage, intent: BillableIntent): 
     }
     if (decision.outcome === 'needs_approval') {
       const amount = `£${(decision.totalPence / 100).toFixed(2)}`
-      const reason = `${amount} exceeds the £1,000 auto-send limit.`
-      await requestApproval(message, amount, reason, ['P4'])
+      const firstInvoice = decision.clauses.includes('P12')
+      const reason = firstInvoice ? decision.reason : `${amount} exceeds the £1,000 auto-send limit.`
+      const overLimit = decision.totalPence > AUTO_SEND_LIMIT_PENCE
+      await requestApproval(message, amount, reason, firstInvoice ? (overLimit ? ['P4', 'P12'] : ['P12']) : ['P4'])
       return
     }
     await sourceAndBill(message, saved)
@@ -462,7 +475,8 @@ export async function handleApproval(messageId: string, action: 'approve' | 'rej
   const message = getMessage(messageId)
   if (!message) return
   updateApproval(messageId, action === 'approve' ? 'approved' : 'rejected')
-  const clause = findSavedDecision(messageId)?.stage === 'sourced' ? 'P8' : 'P4'
+  const savedForClause = findSavedDecision(messageId)
+  const clause = savedForClause?.stage === 'sourced' ? 'P8' : savedForClause?.decision.clauses.includes('P12') ? 'P12' : 'P4'
   recordStep(messageId, 'approval', action === 'approve' ? 'Account owner approved billing.' : 'Account owner rejected billing.', {
     action,
     policyClause: clause,
@@ -519,6 +533,7 @@ async function pollInvoices(): Promise<void> {
         stripeInvoiceId: invoice.stripe_invoice_id,
         csvRows: savedLeads?.success ? savedLeads.data.length : 0,
       }, ['P2', 'P6'])
+      void noteToStaff(invoice.message_id, 'payment', `Payment received: ${message ? findClient(message.author)?.name ?? message.author : 'client'} paid ${staffMoney(invoice.total_pence)} on invoice ${invoice.stripe_invoice_id}; the lead list was delivered. No action needed.`, ['P2', 'P6'])
       syncBooks()
     } catch (error) {
       if (error instanceof BillingBlockedError) return

@@ -37,10 +37,11 @@ function DemoDialog({ onClose }: { onClose: () => void }) {
     <div {...stylex.props(styles.demoBackdrop)} onClick={onClose} role="presentation">
       <div {...stylex.props(styles.demoDialog)} role="dialog" aria-modal="true" aria-label="How Tally works" onClick={(event) => event.stopPropagation()}>
         <div {...stylex.props(styles.demoHeader)}>
-          <Text role="heading16">From a client message to a paid invoice, in 78 seconds</Text>
+          <Text role="heading16">Said. Done. Billed. A client's chat message becomes a correct invoice, in 75 seconds</Text>
           <Button variant="secondary" onClick={onClose}>Close</Button>
         </div>
         <video {...stylex.props(styles.demoVideo)} poster="/demo/tally-demo-poster.png" controls autoPlay playsInline>
+          <source src="/demo/tally-demo.webm" type="video/webm" />
           <source src="/demo/tally-demo.mp4" type="video/mp4" />
         </video>
       </div>

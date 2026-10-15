@@ -10,6 +10,7 @@ import {
 import { reply } from '../channels/channel'
 import { recall, type RoleFact } from '../memory/memory'
 import { extractSignals, type SignalExtractor } from './signals'
+import { noteToStaff } from '../staff/staff'
 
 // Collections role: chases past-due invoices, at most once per 24 h, never on a
 // remembered dispute or before a promised payment date (P7). Code decides.
@@ -162,6 +163,7 @@ export async function runCollectionsTick(
       data_json: JSON.stringify({ at: now.toISOString(), reason: 'past_due', invoiceId: invoice.id, clientName, dueDate: dueDate.toISOString(), terms: terms.fact, text }),
       policy_clause: 'P7',
     })
+    void noteToStaff(invoice.message_id, 'reminder', `Reminded ${clientName} that invoice ${invoice.stripe_invoice_id ?? invoice.id} for ${formatPence(invoice.total_pence)} was due on ${dueDate.toISOString().slice(0, 10)}; next reminder in 24 h at the earliest. No action needed.`, ['P7'])
     outcomes.push({ invoiceId: invoice.id, action: 'reminded', text })
   }
   return outcomes

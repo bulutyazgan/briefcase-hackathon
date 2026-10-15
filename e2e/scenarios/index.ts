@@ -4,6 +4,7 @@ import { buyerAgent } from './buyer-agent'
 import { globexDispute } from './globex-dispute'
 import { northwindMainStory } from './northwind-main-story'
 import { pauseBlocksBilling } from './pause-blocks-billing'
+import { planChange } from './plan-change'
 import { replaySafety } from './replay-safety'
 import { tregSourcing } from './treg-sourcing'
 import { unknownSenderRefused } from './unknown-sender-refused'
@@ -18,4 +19,5 @@ export const scenarios: Scenario[] = [
   tregSourcing,
   buyerAgent,
   globexDispute,
+  planChange,
 ]

@@ -78,6 +78,12 @@ async function handleUpdate(update: TelegramUpdate, onApproval: ApprovalHandler)
   }
 }
 
+// Outbound post to a chat that is not a client thread (the staff chat). No-op without a bot token.
+export async function postTelegramText(chatId: string, text: string): Promise<void> {
+  if (!token) return
+  await call('sendMessage', { chat_id: chatId, text: absolute(text).slice(0, 4000), link_preview_options: { is_disabled: true } })
+}
+
 export async function sendTelegramMessage(
   source: ChannelMessage,
   text: string,

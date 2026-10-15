@@ -54,6 +54,18 @@ export interface JournalLineRow {
   tax_rate: string
 }
 
+// A client onboarded in conversation (P12). Seeded clients stay in clients/clients.ts.
+export interface ClientRow {
+  id: string
+  name: string
+  aliases_json: string
+  billing_email: string
+  price_per_lead_pence: number
+  account_owner: string
+  source_message_id: string
+  created_at: string
+}
+
 export interface AppState {
   messages: ChannelMessage[]
   invoices: InvoiceRow[]
@@ -117,13 +129,57 @@ database.exec(`
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS clients (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    aliases_json TEXT NOT NULL,
+    billing_email TEXT NOT NULL,
+    price_per_lead_pence INTEGER NOT NULL,
+    account_owner TEXT NOT NULL,
+    source_message_id TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
 `)
+
+// Insert-once by id (the client slug): a replayed onboarding keeps the first row.
+export function saveClientOnce(client: Omit<ClientRow, 'created_at'>): boolean {
+  const result = database.query(`
+    INSERT OR IGNORE INTO clients (id, name, aliases_json, billing_email, price_per_lead_pence, account_owner, source_message_id, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    client.id,
+    client.name,
+    client.aliases_json,
+    client.billing_email,
+    client.price_per_lead_pence,
+    client.account_owner,
+    client.source_message_id,
+    new Date().toISOString(),
+  )
+  return result.changes > 0
+}
+
+export function listClients(): ClientRow[] {
+  return database.query<ClientRow, []>('SELECT * FROM clients ORDER BY created_at ASC').all()
+}
+
+export function getClient(clientId: string): ClientRow | null {
+  return database.query<ClientRow, [string]>('SELECT * FROM clients WHERE id = ?').get(clientId) ?? null
+}
+
+// Authors of the messages that produced invoices: how "first invoice" is decided for an onboarded client.
+export function listInvoiceAuthors(): string[] {
+  return database.query<{ author: string }, []>(`
+    SELECT DISTINCT messages.author AS author FROM invoices
+    JOIN messages ON messages.id = invoices.message_id
+  `).all().map((row) => row.author)
+}
 
 export function insertMessage(message: ChannelMessage): ChannelMessage {
   database.query(`
     INSERT OR IGNORE INTO messages (id, channel, thread, author, text, ts, processed_at)
-    VALUES (?, ?, ?, ?, ?, ?, NULL)
-  `).run(message.id, message.channel, message.thread, message.author, message.text, message.ts)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(message.id, message.channel, message.thread, message.author, message.text, message.ts, message.processed_at)
   return getMessage(message.id) ?? message
 }
 
@@ -166,13 +222,22 @@ export function getEvent(messageId: string, step: string): EventRow | null {
   `).get(messageId, step) ?? null
 }
 
+const EVENT_WINDOW = 250
+
+// The bounded newest-first reader for decision rows. Meter rows are per lead (two per qualified
+// lead), have their own reader in listStepEvents, and would push an order's decide row out of the window.
 export function listEvents(messageId?: string): EventRow[] {
   if (messageId) {
     return database.query<EventRow, [string]>(`
-      SELECT * FROM events WHERE message_id = ? ORDER BY created_at DESC LIMIT 250
+      SELECT * FROM events WHERE message_id = ? AND step != 'meter' ORDER BY created_at DESC LIMIT ${EVENT_WINDOW}
     `).all(messageId)
   }
-  return database.query<EventRow, []>('SELECT * FROM events ORDER BY created_at DESC LIMIT 250').all()
+  return database.query<EventRow, []>(`SELECT * FROM events WHERE step != 'meter' ORDER BY created_at DESC LIMIT ${EVENT_WINDOW}`).all()
+}
+
+// The audit trail lists usage metering, so the state window carries the newest meter rows as their own bounded slice.
+function listMeterEvents(): EventRow[] {
+  return database.query<EventRow, []>(`SELECT * FROM events WHERE step = 'meter' ORDER BY created_at DESC LIMIT ${EVENT_WINDOW}`).all()
 }
 
 export function listEventsByStep(step: string): EventRow[] {
@@ -198,6 +263,12 @@ export function saveInvoice(invoice: Omit<InvoiceRow, 'created_at'>): void {
     invoice.hosted_url,
     invoice.pdf_path,
   )
+}
+
+// Seeds only: moves an invoice into the past so the collections role sees it as overdue.
+export function backdateInvoice(invoiceId: string, createdAt: Date): void {
+  database.query('UPDATE invoices SET created_at = ? WHERE id = ?')
+    .run(createdAt.toISOString().slice(0, 19).replace('T', ' '), invoiceId)
 }
 
 export function updateInvoice(invoiceId: string, status: string, hostedUrl?: string, pdfPath?: string): void {
@@ -294,12 +365,12 @@ export function getState(): AppState {
     messages: database.query<ChannelMessage, []>('SELECT * FROM messages ORDER BY ts DESC LIMIT 150').all(),
     invoices: listInvoices(),
     approvals: listApprovals(),
-    events: listEvents(),
+    events: [...listEvents(), ...listMeterEvents()].sort((left, right) => right.created_at.localeCompare(left.created_at)),
   }
 }
 
 export function resetLedger(): void {
-  database.exec('DELETE FROM events; DELETE FROM invoices; DELETE FROM approvals; DELETE FROM messages; DELETE FROM journal_lines;')
+  database.exec('DELETE FROM events; DELETE FROM invoices; DELETE FROM approvals; DELETE FROM messages; DELETE FROM journal_lines; DELETE FROM clients;')
 }
 
 export function getSetting(key: string): string | null {

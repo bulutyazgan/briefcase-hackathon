@@ -18,7 +18,7 @@ bun e2e/doctor.ts                    # read-only health check of a running stack
 `run.ts` starts the mocks (:4010), the Vite dev server (:5179), and, per
 scenario, a fresh server on :8797 (`E2E_API_PORT`; `support/vite-e2e.config.ts` proxies there)
 with a temp SQLite file, `STRIPE_SECRET_KEY=sk_test_mock`, Treg/Cognee pointed at
-the mocks, and no Fireworks/Firecrawl/Slack keys (the product uses its
+the mocks, and no OpenAI/Fireworks/Firecrawl/Slack keys (the product uses its
 deterministic fallbacks). A `bun run dev` on :8787 can keep running.
 
 Evidence lands in `e2e/artifacts/` (git-ignored): `<scenario>/<nn>-<step>.png`,
@@ -62,5 +62,5 @@ so no harness run can reach api.stripe.com. Safe to delete.
 
 - Real Stripe, Treg and Cognee accounts, auth, rate limits and response drift.
   The mocks follow documented shapes and can be wrong in the details.
-- Fireworks extraction (only the heuristic fallback runs), Firecrawl, Slack.
+- OpenAI and Fireworks extraction (only the heuristic fallback runs), Firecrawl, Slack.
 - The PDF content (only that rendering ran and the link exists).

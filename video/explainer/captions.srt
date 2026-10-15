@@ -1,0 +1,63 @@
+1
+00:00:00,600 --> 00:00:04,110
+Your client asks for a change, in chat.
+
+2
+00:00:04,360 --> 00:00:08,270
+Usually this is where the form, the queue and the wait begin.
+
+3
+00:00:08,520 --> 00:00:12,260
+Tally reads the thread instead. The message is the request.
+
+4
+00:00:13,400 --> 00:00:18,070
+It finds the client in your CRM and recalls their deal and your price list.
+
+5
+00:00:18,400 --> 00:00:22,370
+The part that makes this safe: the model reads and asks.
+
+6
+00:00:22,620 --> 00:00:26,390
+Code decides and pays, inside a written policy.
+
+7
+00:00:26,640 --> 00:00:30,030
+Code checks the clauses and creates the Stripe invoice:
+
+8
+00:00:30,280 --> 00:00:34,320
+five thousand pounds, yearly, due in seven days.
+
+9
+00:00:34,570 --> 00:00:40,210
+The client gets the reply and the PDF in the same chat. They never left it.
+
+10
+00:00:42,400 --> 00:00:47,950
+Every pound carries a receipt: their words, the remembered fact, the clause.
+
+11
+00:00:50,400 --> 00:00:55,050
+Your team gets a note, not a ticket. The books stay right.
+
+12
+00:00:56,400 --> 00:01:00,830
+Now change one thing. A dispute crosses a written limit.
+
+13
+00:01:01,080 --> 00:01:04,340
+Code stops and asks a human, in the same chat.
+
+14
+00:01:04,590 --> 00:01:07,130
+One word pauses everything.
+
+15
+00:01:07,400 --> 00:01:09,760
+Said. Done. Billed.
+
+16
+00:01:10,010 --> 00:01:14,360
+The conversation is the contract. The agent is the back office.

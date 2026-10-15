@@ -1,0 +1,10 @@
+[
+  { "topic": "services", "fact": "We sell lead lists: named decision-makers at target companies, matched to your ideal customer profile and buying signals, delivered as a CSV with name, company and profile URL." },
+  { "topic": "price", "fact": "Standard price is £4 per lead for a lead list." },
+  { "topic": "minimum", "fact": "Minimum order is 100 leads." },
+  { "topic": "terms", "fact": "Invoices are due on 7-day terms, paid by card or bank transfer from the Stripe invoice." },
+  { "topic": "discounts", "fact": "No discounts for new clients. 10% over 200 leads exists only as a remembered deal for a specific client, never as a standing offer." },
+  { "topic": "delivery", "fact": "Leads are sourced after the order is confirmed and delivered as a CSV when the invoice is paid; you are billed only for leads actually delivered." },
+  { "topic": "vat", "fact": "Prices are net of VAT; UK VAT at 20% is added on the invoice." },
+  { "topic": "not-offered", "fact": "We do not run outreach campaigns, write copy, or sell email-sending infrastructure." }
+]

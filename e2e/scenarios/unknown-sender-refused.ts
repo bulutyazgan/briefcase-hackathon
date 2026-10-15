@@ -25,7 +25,7 @@ export const unknownSenderRefused: Scenario = {
     const decide = state.events.find((event) => event.message_id === messageId && event.step === 'decide')
     assert(decide !== undefined, 'a decide event must be recorded')
     await openInvoiceList(page, context.web)
-    await page.getByText('No invoices have been created yet.').waitFor()
+    await page.getByText('No invoices have been created').waitFor()
     await context.shot('invoices-empty')
     const log = await context.mockLog()
     assert(stripeCalls(log, 'POST', /^\/v1\//).length === 0, 'Stripe must receive no writes')

@@ -1,131 +1,108 @@
-# Record the two-minute demo
+# Record the two-minute demo: "Said, done, billed"
 
-This script follows the two-minute target in `PLAN.md` section 12. It runs on the web app at `http://localhost:5173`. The landing page is at `/`. The dashboard is under `/app`: `/app/inbox` has the client channel, the composer, and the approval cards, `/app/invoices/:id` has the invoice, the evidence, and the PDF, and `/app/audit` has the ledger. The buyer agent, meters, credit notes, and books are merged on the server, so every beat below runs on the current code. Another agent is adding the Books page at `/app/books` and the Guardrails panel on `/app/policy`.
+Six beats on the web app at `http://localhost:5173`. The composer on `/app/inbox` has a **Send as** select (Client — Northwind, Acme, Globex, Initech, Account owner, Unknown sender) and a **Message** box. Invoices live under `/app/invoices/:id`, the ledger under `/app/audit`, journals under `/app/books`. The headless version of this script is `e2e/film-demo.ts`; it runs the same six beats against the mock stack and writes a video, a keyframe per beat and `beats.json`.
 
 ## Before you hit record
 
-1. In `server/.env`, set `STRIPE_SECRET_KEY` to an `rk_test_` key. An `sk_test_` key also bills, but the Guardrails panel then shows "Full secret key (sk_test_) — switch to restricted" instead of "Restricted key (rk_test_)". Until the panel is on `/app/policy`, `curl localhost:8787/api/control` shows the same key mode.
-2. Set `OPENAI_API_KEY` (or `FIREWORKS_API_KEY`), `COGNEE_API_KEY`, `COGNEE_BASE_URL`, and `TREG_TOKEN` if you have them. Without them the loop still runs on its fallbacks.
-3. If you use Treg, top up the account. Treg gives $1 of free credit once.
-4. Proof steps, both run on 15 Oct 2026 against the merged base:
+1. In `server/.env` set `STRIPE_SECRET_KEY` (an `rk_test_` key shows "Restricted key" on `/app/policy`; `sk_test_` also bills), `OPENAI_API_KEY`, `COGNEE_API_KEY`, `COGNEE_BASE_URL` and `TREG_TOKEN`. Without them the loop runs on its fallbacks.
+2. If you use Treg, top up the account. Treg gives $1 of free credit once.
+3. Choose live or mock:
 
-	- **Mock harness** (`bun run e2e`, ports 4010, 5179, 8797; override with `MOCK_PORT`, `E2E_API_PORT`, `E2E_WEB_PORT` if taken): 6 passed, 0 failed after the Treg paging fix. northwind-main-story shows "Invoice created for £1,080.00 net + £216.00 VAT (20%) = £1,296.00", 300 leads ready, invoice paid, 300 meter events. Screenshots land in `e2e/artifacts/`.
-	- **Live providers** (real OpenAI, Cognee, Treg and Stripe test keys in `server/.env`): the Northwind order went extract → recall → approval → Treg bought 182 real Apollo leads → Stripe invoice `in_1UQuBX…` for £728.00 net + VAT → paid with 4242 → lead CSV delivered → 182 meter events. Each `server/scripts/verify-*.ts` script also passed live (books, meters, credit notes, buyer, memory, treg).
+	- **Live** (the track rule): real Stripe test mode, real Treg leads, real Cognee. The lead count depends on Apollo's inventory at the moment of the call. On 15 Oct, "in London" filled 182 leads (£728.00 net, under the 200-lead discount threshold) and "in the UK" filled 221 (£795.60 after Northwind's 10%). Tally bills exactly what it bought, so say "it bought N real leads and billed exactly those" and let the audit trail show the count. Extraction on gpt-5-mini takes 12 to 20 s; keep talking through the recall beat.
+	- **Deterministic**: `E2E_SEED=demo bun e2e/stack.ts` (ports 4010, 8797, 5179; override with `MOCK_PORT`, `E2E_API_PORT`, `E2E_WEB_PORT`) and record on `http://localhost:5179/app/inbox`. 300 leads, £1,080.00 net, hosted "Pay with 4242" page served by the mock. Say that the Stripe calls are mirrored by a local mock and cut to the live Stripe dashboard for the invoices created by the live run.
 
-	The live lead count depends on Apollo's inventory at the moment of the call: "in London" filled 182 (£728.00, no discount, under the 200-lead threshold); "in the UK" filled 221 (£795.60 after the 10% deal). Tally bills exactly what it bought, so the on-camera amount will differ from £1,080.00 on a live run. Two ways to record:
-
-	- **Deterministic**: run the mock harness stack (`bun e2e/stack.ts`) and record on `http://localhost:5179/app/inbox`: 300 leads, £1,080.00 net, hosted "Pay with 4242" page served by the mock. Say on camera that the Stripe calls are mirrored by a local mock and cut to the live Stripe dashboard for the real invoices created by the live run.
-	- **Live**: real Stripe test mode on camera (the track rule), with the amount Apollo allows. Say "it bought 221 real leads and billed exactly those" and let the audit trail show the count. Extraction on gpt-5-mini takes 12–20 s before the reply appears; keep talking through the recall beat.
-
-5. Stop the server, then reset the ledger.
+4. Stop the server, then reset and seed the demo state. This resets the ledger, clears the kill switch, seeds Northwind's open need, and creates Globex's 50-lead invoice through the real billing path (a Stripe test-mode invoice for £200.00 net plus VAT, with 50 delivered rows and no remembered dispute) backdated 10 days against Globex's 7-day terms. It writes client facts and the company knowledge base to Cognee when keys exist and prints the ids it created. `bun scripts/verify-demo-seed.ts` in `server/` does the same on a scratch ledger and shows the reminder decision.
 
 	```sh
-	bun run seed
-	```
-
-6. Start the app.
-
-	```sh
+	bun run demo:seed
 	bun run dev
 	```
 
-7. Check the kill switch with `curl localhost:8787/api/control`. If it shows paused, send `/resume` as **Account owner** from the composer. `bun run seed` does not clear the kill switch.
-8. Send one rehearsal order, check that a Stripe invoice appears, then run `bun run seed` again and restart.
-9. Set the browser zoom to 125% and close other tabs. Open a second tab on the Stripe test dashboard, Invoices page.
-10. Keep this file open on a second screen.
+5. Send one rehearsal order as Client — Northwind, check that a Stripe invoice appears, then run `bun run demo:seed` again and restart.
+6. Browser zoom 125%, other tabs closed. Second tab on the Stripe test dashboard, Invoices page. Keep this file on a second screen.
+
+Beats marked **needs merge** depend on slices still merging (intake P12, subscriptions P13, staff notes). Each one has a fallback line.
 
 ## Script
 
-### 0:00 The problem
+### 0:00 Beat 1. Hook
 
-Open `http://localhost:5173/` and show the landing page, then click **Open Tally** to land on the empty Inbox.
+Open `http://localhost:5173/` and click **Open Tally** to land on `/app/inbox`.
 
-Say: "Agencies agree work with clients in chat. Then nobody raises the invoice. Tally hears the commitment and bills it, inside a written policy."
+Say: "Business happens in chat. The paperwork lags behind it. Tally hears what was agreed and does everything that used to follow: quote, order, invoice, VAT, collection, books. Inside a written policy, with a receipt for every pound."
 
-### 0:15 The client commits
+### 0:15 Beat 2. A new client walks in (needs merge: intake P12)
 
-In the composer on `/app/inbox`, choose **Client — Northwind** and send:
-
-```
-Let's kick off Q4. 300 fintech CFO leads in the UK, same deal as last time.
-```
-
-Say: "Northwind just ordered 300 leads in a chat message. Nobody on our side has touched it."
-
-### 0:30 Recall, price, decide
-
-Wait for Tally's reply asking for approval. Open `/app/audit` in a second tab, or scroll the Inbox reply.
-
-With `COGNEE_API_KEY` set, say: "Tally recalled from Cognee that Northwind agreed 10% off orders over 200 leads on August 12." Without it, say: "Tally recalled from its seeded memory that Northwind agreed 10% off orders over 200 leads on August 12."
-
-Then say: "Code priced it at 300 times £4, less 10%, which is £1,080 net. That is over the £1,000 auto-send limit, so policy clause P4 asks the account owner."
-
-### 0:45 Approve, buy, bill
-
-Click **Approve invoice** on the approval card.
-
-Say: "One click. Only now does Tally spend money. It buys the leads, and code caps every supplier call and the order total under P9. Each qualified lead sends a Stripe meter event, so every pound traces to one lead. Then it creates a draft Stripe invoice, attaches the lines with 20% UK VAT, and finalizes it. £1,080 net, £216 VAT, £1,296 on the invoice."
-
-Go to `/app/invoices` and open the invoice. Click **Open Stripe invoice** in the page header for the hosted page, then scroll the PDF frame to page 2, or click **Open PDF**. The links in the chat reply are text, so use the invoice page.
-
-Say: "Page 2 is the evidence appendix, 'Why we billed this.' Every line carries the client's quote, the memory fact, and the policy clauses."
-
-### 1:05 Payment
-
-Pick one of the two paths.
-
-Test card: on the invoice page, click **Pay as client (test card)**. That calls `POST /api/invoices/:id/simulate-payment`, which pays with Stripe's `pm_card_visa`. Say: "The client pays the Stripe invoice."
-
-Buyer agent: the web app has no button for it yet, so start it from a terminal.
-
-```sh
-curl -s -X POST localhost:8787/api/buyer/start
-```
-
-Watch the Inbox thread in this order:
-
-1. The procurement agent posts "PO-2026-104: Let's kick off Q4. 300 fintech CFO leads in the UK, same deal as last time."
-2. Tally prices it and asks for approval. Click **Approve invoice**.
-3. Tally finalizes the invoice, then offers an upsell: "Add 200 more leads for £800.00?"
-4. The buyer declines the upsell under B1, its monthly budget.
-5. The buyer pays the invoice itself with `pm_card_visa` and posts "Paid under B1–B3: ...".
-
-Say: "Northwind's own agent checked its budget, declined an upsell, matched the PO, and paid. No human on either side."
-
-### 1:20 Delivery and the books
-
-Wait up to 10 seconds for "Payment received. Here is the lead list." in the thread.
-
-Say: "Tally posted the journal: debtors, sales, 20% VAT, and the sourcing cost, so the margin is in the books." When the Books page is on `/app/books`, open it and click **Export journals CSV** while you say it. Until then, show the `margin` event on `/app/audit`.
-
-### 1:35 Dispute
-
-The composer continues the author's latest thread, so a dispute typed as **Client — Northwind** lands on the first order. Send:
+Send as **Client — Initech**:
 
 ```
-Only 280 of those leads were valid.
+Hi, we're Initech. What do you charge for lead lists? We'd need around 300 fintech CFO leads in London.
 ```
 
-Say: "Northwind disputes 20 leads. Tally checks the delivered rows and issues a Stripe credit note at the net price per lead. Up to £200 is automatic under P11. Above that, the account owner approves."
+What appears: Tally answers from the company knowledge base (£4 per lead, 100 minimum, 7-day terms, VAT on top) and asks the one clarifying question it needs. Audit: `company_learned`, `intake`.
 
-With 280 valid of 300, the credit is 20 times £3.60, which is £72, so it is automatic. "Only 240 of those leads were valid." credits £216 and shows an approval card instead. The composer offers only **Client — Northwind** and **Account owner**, so a Globex dispute needs a Globex order posted through `POST /api/channels/simulator/messages` first.
+Say: "Initech has never spoken to us. Tally answers from the company's own knowledge base and asks the one thing it still needs."
 
-Kill-switch variant, if time allows: choose **Account owner** and send `/pause`. Then choose **Client — Northwind** and send `Go ahead with 50 more leads.` Say: "The kill switch stops all sourcing and billing, and the audit log records the blocked step under F1." Send `/resume` as **Account owner** after the take.
+Send as **Client — Initech**:
 
-### 1:50 Why did you bill this?
+```
+Let's do 300. Fintech CFOs in London. Send invoices to ap@initech.example.
+```
 
-Choose **Client — Northwind** and send:
+What appears: `onboard` (P12, standard price list), then an approval card for £1,200.00 net because a new client's first invoice always waits for the account owner. Click **Approve invoice**. Tally buys the leads from its supplier (real Treg leads on live), creates the Stripe invoice with 20% VAT and emails it. Open `/app/invoices` and the new invoice; show **Evidence trail** and the PDF appendix.
+
+Say: "One message and Initech is a client: created in the ledger, priced from the standard list, first invoice held for one human click. Approve, and Tally buys the leads and emails a real Stripe invoice that cites Initech's own words and the clauses."
+
+Fallback if intake is not in: send the same two messages as **Client — Northwind** with "same deal as last time" on the second; say "Northwind is a known client, so Tally recalls the agreed 10% over 200 leads and prices £1,080 net".
+
+### 0:50 Beat 3. Tally spots revenue; the client's agent pays
+
+What appears, without typing: the opportunity tick saw Northwind's seeded need ("the pipeline is thin", quarterly cadence, last list 2026-07-14) and posted an offer under O1 to O4. Click **Start buyer agent**. Northwind's procurement agent posts a PO, Tally prices it and asks for approval (over £1,000), click **Approve invoice**, Tally offers an upsell, the buyer declines it under B1 (budget), then pays the invoice itself and posts "Paid under B1–B3".
+
+Say: "Nobody asked Northwind. Tally remembered a quarterly cadence and offered the next list. Northwind's own procurement agent checked its budget, declined an upsell, matched the PO and paid. No human on either side."
+
+### 1:15 Beat 4. Plan change by conversation (needs merge: subscriptions P13 + staff notes)
+
+Send as **Client — Northwind**:
+
+```
+Can we switch to 100 leads a month, billed yearly?
+```
+
+What appears: a Stripe subscription (product, price, `send_invoice`, prorations) at £4,320.00 net per year after the remembered 10%, a `plan_change` event under P13 and a `staff_note` on `/app/notifications`.
+
+Say: "A plan change is a sentence, not a form. Tally creates the subscription in Stripe with proration and leaves the team a note."
+
+Fallback if P13 is not wired: Tally answers in prose and bills a one-off yearly invoice. Say "the subscription adapter is on its branch; today it bills the year as one invoice".
+
+### 1:30 Beat 5. Late payer, then a dispute
+
+What appears, without typing: Globex's 50-lead invoice has been open 10 days against its remembered 7-day terms, so it is 3 days late and the first collections tick (every 60 s) posts a "Friendly reminder" in the Globex thread citing the agreed terms (P7). The seed leaves Globex with no remembered dispute, which is what lets the reminder go out, and its invoice exists in Stripe (test mode, or the mock), so the credit note below lands on a real invoice. Without a Stripe key the seed falls back to a placeholder id: the reminder still goes out, but the credit note fails at Stripe. Live Cognee keeps every fact earlier seeds wrote, so an older Globex fact that mentions a dispute makes the tick skip under P7; the `collections_skip` row on `/app/audit` names the fact. If that happens, delete the `globex-partners` dataset in Cognee Cloud and seed again, or record the beat on the mock stack.
+
+Post as **Client — Globex** (it continues Globex's latest thread):
+
+```
+Only 40 of those leads were valid.
+```
+
+What appears: Tally checks the delivered rows and issues a Stripe credit note for 10 leads at £4.00 net, £40.00, automatic under P11 (up to £200). The dispute is remembered, so reminders stop.
+
+Say: "Tally chases politely and once a day. The moment Globex disputes, it credits the invalid leads at the agreed net price and stops chasing. Above £200 a human approves."
+
+### 1:45 Beat 6. Why, books, pause
+
+Send as **Client — Northwind**:
 
 ```
 Why £1,080?
 ```
 
-The composer continues Northwind's latest thread, so the question reaches the order and Tally answers in it.
+The composer continues the author's latest thread. After beat 4 that is the plan-change thread, which holds no invoice, so the question would go unanswered there. Either ask it right after beat 3, before the plan change, or reply inside the £1,080 invoice's thread with `bun e2e/drive.ts thread-reply "Why £1,080?" --as "Client — Northwind"` (it replies in the newest invoice's thread). The film does the latter.
 
-Say: "Ask why, and Tally answers with the client's own words, the remembered deal, the policy clauses, and the Stripe invoice id."
+What appears: the answer quotes Northwind's own words, the remembered deal, the clauses and the Stripe invoice id. Then open `/app/books` and click **Export journals CSV**: debtors, sales, VAT and the sourcing cost, so the margin is in the books.
 
-### 2:00 Close
+Send as **Account owner**: `/pause`. The sidebar shows **Paused** and the next sourcing or billing step is blocked under F1.
 
-Scroll `/app/audit` once.
+Say: "Ask why and you get the client's words, the memory, the clause and the invoice id. The books are posted. And one word stops it all. The LLM reads and explains. Code decides and executes."
 
-Say: "The LLM reads and explains. Code decides and executes. Every pound has a receipt."
+Send `/resume` as **Account owner** after the take.

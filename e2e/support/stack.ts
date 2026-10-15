@@ -37,12 +37,14 @@ export async function seedCogneeFromProductSeed(): Promise<void> {
 export function serverEnv(dbPath: string): Record<string, string> {
   const env: Record<string, string> = {}
   for (const [key, value] of Object.entries(process.env)) {
-    if (value !== undefined && !/^(FIREWORKS|FIRECRAWL|SLACK|STRIPE|TREG|COGNEE)_/.test(key)) env[key] = value
+    if (value !== undefined && !/^(FIREWORKS|FIRECRAWL|OPENAI|SLACK|STRIPE|TREG|COGNEE)_/.test(key)) env[key] = value
   }
   return {
     ...env,
     PORT: String(apiPort),
     TALLY_DB_PATH: dbPath,
+    // Bun fills a missing key from server/.env but keeps a preset one, so an empty key pins the heuristic extractor.
+    OPENAI_API_KEY: '',
     STRIPE_SECRET_KEY: process.env.E2E_STRIPE_KEY ?? 'sk_test_mock',
     STRIPE_API_BASE: mockBase,
     TREG_TOKEN: 'mock',
@@ -54,7 +56,9 @@ export function serverEnv(dbPath: string): Record<string, string> {
 
 export async function startServer(dbPath: string, logFile: string): Promise<() => Promise<void>> {
   const env = serverEnv(dbPath)
-  const seed = Bun.spawn(['bun', 'src/seed.ts'], { cwd: join(root, 'server'), env, stdout: 'ignore', stderr: 'inherit' })
+  // E2E_SEED=demo loads the six-beat demo state (Globex late invoice) for e2e/film-demo.ts.
+  const seedScript = process.env.E2E_SEED === 'demo' ? 'src/demo-seed.ts' : 'src/seed.ts'
+  const seed = Bun.spawn(['bun', seedScript], { cwd: join(root, 'server'), env, stdout: 'ignore', stderr: 'inherit' })
   if ((await seed.exited) !== 0) throw new Error('seed failed')
   const preload = join(e2eDir, 'support/stripe-base-preload.ts')
   const server = Bun.spawn(['bun', '--preload', preload, 'src/index.ts'], {
