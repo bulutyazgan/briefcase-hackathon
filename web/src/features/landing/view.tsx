@@ -35,7 +35,7 @@ export function Landing() {
       <div {...stylex.props(styles.content)}>
         <Page>
           <div {...stylex.props(styles.hero)}>
-            <Opening title="Turn client commitments into invoices, with every pound explained." lede="Tally listens for agreed work, checks it against a written billing policy and prepares the Stripe invoice with its evidence attached." tools={<Button variant="primary" onClick={() => navigate('/app/inbox')}>Explore Tally</Button>} />
+            <Opening title="PostHog for finance and customer service." lede="Remove the paperwork between yes and paid. One agent in the client chat onboards, sells, invoices and follows up, and every pound is explained." tools={<Button variant="primary" onClick={() => navigate('/app/inbox')}>Explore Tally</Button>} />
             <div {...stylex.props(styles.heroCard)}>
               <Text role="label">A client commitment</Text>
               <div {...stylex.props(styles.message)}>“Let’s kick off Q4. 300 fintech CFO leads in London, same deal as last time.”</div>
