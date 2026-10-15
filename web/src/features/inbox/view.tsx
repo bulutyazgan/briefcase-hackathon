@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import * as stylex from '@stylexjs/stylex'
 import type { AppState, ChannelMessage } from '../../api'
-import { decideApproval, sendMessage } from './api'
+import { decideApproval, sendMessage, startBuyerAgent } from './api'
 import { styles } from './inbox.stylex'
 
 interface InboxProps {
@@ -52,6 +52,16 @@ export function Inbox({ state, onRefresh }: InboxProps) {
     }
   }
 
+  async function startBuyer() {
+    setError('')
+    try {
+      await startBuyerAgent()
+      onRefresh()
+    } catch (startError) {
+      setError(String(startError))
+    }
+  }
+
   async function approve(messageId: string, action: 'approve' | 'reject') {
     setApprovalBusy(messageId)
     setError('')
@@ -72,6 +82,9 @@ export function Inbox({ state, onRefresh }: InboxProps) {
           <h2 id="inbox-title" {...stylex.props(styles.title)}>Client channel</h2>
           <p {...stylex.props(styles.caption)}>Simulator · Northwind Capital</p>
         </div>
+        <button type="button" {...stylex.props(styles.button)} onClick={() => void startBuyer()}>
+          Start buyer agent
+        </button>
         <span aria-label="Agent status">● Live</span>
       </header>
       <div {...stylex.props(styles.feed)} aria-live="polite">

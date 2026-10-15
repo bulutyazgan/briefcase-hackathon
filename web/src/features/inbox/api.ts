@@ -15,3 +15,8 @@ export async function decideApproval(messageId: string, action: 'approve' | 'rej
   })
   if (!response.ok) throw new Error(`Approval was not updated (${response.status}).`)
 }
+
+export async function startBuyerAgent(): Promise<void> {
+  const response = await fetch('/api/buyer/start', { method: 'POST' })
+  if (!response.ok) throw new Error(`Buyer agent did not start (${response.status}).`)
+}

@@ -146,6 +146,14 @@ export function listEvents(messageId?: string): EventRow[] {
   return database.query<EventRow, []>('SELECT * FROM events ORDER BY created_at DESC LIMIT 250').all()
 }
 
+export function listEventsByStep(step: string): EventRow[] {
+  return database.query<EventRow, [string]>('SELECT * FROM events WHERE step = ? ORDER BY created_at ASC').all(step)
+}
+
+export function listThreadMessages(thread: string): ChannelMessage[] {
+  return database.query<ChannelMessage, [string]>('SELECT * FROM messages WHERE thread = ? ORDER BY ts ASC').all(thread)
+}
+
 export function saveInvoice(invoice: Omit<InvoiceRow, 'created_at'>): void {
   database.query(`
     INSERT OR IGNORE INTO invoices
