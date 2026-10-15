@@ -12,7 +12,10 @@ This script follows the two-minute target in `PLAN.md` section 12. It runs on th
 	- **Mock harness** (`bun run e2e`, ports 4010, 5179, 8797; override with `MOCK_PORT`, `E2E_API_PORT`, `E2E_WEB_PORT` if taken): 6 passed, 0 failed after the Treg paging fix. northwind-main-story shows "Invoice created for £1,080.00 net + £216.00 VAT (20%) = £1,296.00", 300 leads ready, invoice paid, 300 meter events. Screenshots land in `e2e/artifacts/`.
 	- **Live providers** (real OpenAI, Cognee, Treg and Stripe test keys in `server/.env`): the Northwind order went extract → recall → approval → Treg bought 182 real Apollo leads → Stripe invoice `in_1UQuBX…` for £728.00 net + VAT → paid with 4242 → lead CSV delivered → 182 meter events. Each `server/scripts/verify-*.ts` script also passed live (books, meters, credit notes, buyer, memory, treg).
 
-	Apollo only held 182 fintech CFOs **in London**, so the live invoice was £728 (182 × £4, under the 200-lead discount threshold): correct policy, wrong story. For the recording, ask for **"300 fintech CFO leads in the UK"** so Apollo can fill all 300 and the 10% deal applies (£1,080.00). Extraction on gpt-5-mini takes about 15–20 s before the reply appears; keep talking through the recall beat.
+	The live lead count depends on Apollo's inventory at the moment of the call: "in London" filled 182 (£728.00, no discount, under the 200-lead threshold); "in the UK" filled 221 (£795.60 after the 10% deal). Tally bills exactly what it bought, so the on-camera amount will differ from £1,080.00 on a live run. Two ways to record:
+
+	- **Deterministic**: run the mock harness stack (`bun e2e/stack.ts`) and record on `http://localhost:5179/app/inbox`: 300 leads, £1,080.00 net, hosted "Pay with 4242" page served by the mock. Say on camera that the Stripe calls are mirrored by a local mock and cut to the live Stripe dashboard for the real invoices created by the live run.
+	- **Live**: real Stripe test mode on camera (the track rule), with the amount Apollo allows. Say "it bought 221 real leads and billed exactly those" and let the audit trail show the count. Extraction on gpt-5-mini takes 12–20 s before the reply appears; keep talking through the recall beat.
 
 5. Stop the server, then reset the ledger.
 
