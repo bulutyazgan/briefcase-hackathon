@@ -37,6 +37,7 @@ import { runCollectionsTick } from '../collections/collections'
 import { meterQualifiedLeads, recordLeadQualification } from '../meters/meters'
 import { handleCreditNoteApproval, handleDispute } from '../credit-notes/credit-notes'
 import { offerUpsellToAgentBuyer } from '../buyer/upsell'
+import { converse, wantsPlanChange } from '../concierge/concierge'
 
 const intentSchema = z.object({
   isCommitment: z.boolean(),
@@ -346,6 +347,11 @@ async function processMessage(message: ChannelMessage): Promise<void> {
   try {
     if (/\bwhy\b/i.test(message.text) && await explainLatestInvoice(message)) return
     if (await handleDispute(message)) return
+    if (wantsPlanChange(message.text)) {
+      await converse(message)
+      markMessageProcessed(message.id)
+      return
+    }
     const extracted = await extractIntent(message)
     if (!extracted) {
       const reason = 'OPENAI_API_KEY is not configured; extraction is blocked.'
@@ -373,7 +379,7 @@ async function processMessage(message: ChannelMessage): Promise<void> {
         outcome: 'refuse',
         reason: 'P1 requires an explicit commitment with a verbatim quote.',
       }, ['P1'])
-      await reply(message, 'I could not confirm a billable client commitment in that message.')
+      await converse(message)
       markMessageProcessed(message.id)
       return
     }

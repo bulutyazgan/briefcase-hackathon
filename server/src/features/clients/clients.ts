@@ -12,6 +12,13 @@ export interface Client {
 
 export const CLIENTS: readonly Client[] = [
   {
+    name: 'Louis',
+    aliases: ['louis'],
+    pricePerLeadPence: 400,
+    billingEmail: 'lelouis.lnv@gmail.com',
+    accountOwner: 'Bulut',
+  },
+  {
     name: 'Northwind Capital',
     aliases: ['northwind'],
     pricePerLeadPence: 400,

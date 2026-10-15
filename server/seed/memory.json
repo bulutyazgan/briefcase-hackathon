@@ -68,5 +68,12 @@
     "date": "2026-09-20",
     "role": "collections",
     "sourceMessageId": "seed:globex-2026-09-20-dispute"
+  },
+  {
+    "clientName": "Louis",
+    "fact": "Signed the website care plan at £500 per month, billed monthly",
+    "date": "2026-06-01",
+    "role": "billing",
+    "sourceMessageId": "seed:louis-2026-06-01-care-plan"
   }
 ]
