@@ -10,7 +10,7 @@ export const styles = stylex.create({
   },
   column: {
     minWidth: 0,
-    backgroundColor: tokens.surfaceAlt,
+    backgroundColor: color.well,
     borderColor: color.hairline,
     borderStyle: 'solid',
     borderWidth: '1px',
@@ -41,7 +41,7 @@ export const styles = stylex.create({
     borderColor: color.hairline,
     borderStyle: 'solid',
     borderWidth: '1px',
-    borderRadius: tokens.radiusMedium,
+    borderRadius: radius.md,
     paddingBlock: space.sm,
     paddingInline: space.sm,
     display: 'flex',
@@ -66,7 +66,7 @@ export const styles = stylex.create({
   clause: {
     borderRadius: radius.pill,
     backgroundColor: color.well,
-    color: tokens.accentDeep,
+    color: color.ink,
     fontFamily: text.fontMono,
     fontSize: text.label,
     paddingBlock: '2px',
