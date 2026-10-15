@@ -36,6 +36,7 @@ import { runCollectionsTick } from '../collections/collections'
 import { meterQualifiedLeads, recordLeadQualification } from '../meters/meters'
 import { handleCreditNoteApproval, handleDispute } from '../credit-notes/credit-notes'
 import { offerUpsellToAgentBuyer } from '../buyer/upsell'
+import { handleOfferAcceptance, handleOfferApproval, runOpportunityTick } from '../opportunities/opportunities'
 
 const intentSchema = z.object({
   isCommitment: z.boolean(),
@@ -344,6 +345,7 @@ async function processMessage(message: ChannelMessage): Promise<void> {
   try {
     if (/\bwhy\b/i.test(message.text) && await explainLatestInvoice(message)) return
     if (await handleDispute(message)) return
+    if (await handleOfferAcceptance(message, billCommitment)) return
     const extracted = await extractIntent(message)
     if (!extracted) {
       const reason = 'OPENAI_API_KEY is not configured; extraction is blocked.'
@@ -375,7 +377,17 @@ async function processMessage(message: ChannelMessage): Promise<void> {
       markMessageProcessed(message.id)
       return
     }
+    await billCommitment(message, intent)
+    markMessageProcessed(message.id)
+  } catch (error) {
+    recordStep(message.id, 'error', 'The agent could not complete this message.', { error: String(error) })
+    await reply(message, `Tally could not complete this request: ${String(error)}`)
+    markMessageProcessed(message.id)
+  }
+}
 
+// The commitment path: recall, price, decide, then source and bill. Shared by extracted commitments and accepted offers.
+async function billCommitment(message: ChannelMessage, intent: BillableIntent): Promise<void> {
     let facts: MemoryFact[] = []
     try {
       facts = await recallFacts(intent.clientName, intent.ask)
@@ -414,23 +426,15 @@ async function processMessage(message: ChannelMessage): Promise<void> {
 
     if (decision.outcome === 'refuse') {
       await reply(message, `I will not create an invoice. ${decision.reason} Policy: ${decision.clauses.join(', ')}.`)
-      markMessageProcessed(message.id)
       return
     }
     if (decision.outcome === 'needs_approval') {
       const amount = `£${(decision.totalPence / 100).toFixed(2)}`
       const reason = `${amount} exceeds the £1,000 auto-send limit.`
       await requestApproval(message, amount, reason, ['P4'])
-      markMessageProcessed(message.id)
       return
     }
     await sourceAndBill(message, saved)
-    markMessageProcessed(message.id)
-  } catch (error) {
-    recordStep(message.id, 'error', 'The agent could not complete this message.', { error: String(error) })
-    await reply(message, `Tally could not complete this request: ${String(error)}`)
-    markMessageProcessed(message.id)
-  }
 }
 
 async function processApprovedMessage(messageId: string): Promise<void> {
@@ -446,6 +450,7 @@ async function processApprovedMessage(messageId: string): Promise<void> {
 
 export async function handleApproval(messageId: string, action: 'approve' | 'reject'): Promise<void> {
   if (await handleCreditNoteApproval(messageId, action)) return
+  if (await handleOfferApproval(messageId, action)) return
   const message = getMessage(messageId)
   if (!message) return
   updateApproval(messageId, action === 'approve' ? 'approved' : 'rejected')
@@ -479,6 +484,7 @@ export function startAgentLoop(): void {
     void pollInvoices()
   }, 10000)
   setInterval(() => { void runCollectionsTick(new Date()).catch((error) => console.warn(`Collections tick failed: ${String(error)}`)) }, 60000)
+  setInterval(() => { void runOpportunityTick(new Date()).catch((error) => console.warn(`Opportunity tick failed: ${String(error)}`)) }, 20000)
 }
 
 async function pollInvoices(): Promise<void> {
