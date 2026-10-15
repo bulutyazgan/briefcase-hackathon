@@ -1,0 +1,27 @@
+{
+  "paused": false,
+  "keyMode": "secret",
+  "scopes": [
+    {
+      "resource": "Customers",
+      "access": "write"
+    },
+    {
+      "resource": "Invoices",
+      "access": "write"
+    },
+    {
+      "resource": "Invoice items",
+      "access": "write"
+    },
+    {
+      "resource": "Credit notes",
+      "access": "write"
+    },
+    {
+      "resource": "Meter events",
+      "access": "write"
+    }
+  ],
+  "readOnly": true
+}
