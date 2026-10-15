@@ -8,11 +8,19 @@ import { StatStrip } from '../../components/ui/stat-strip'
 import { Text } from '../../components/ui/text'
 import { Table } from '../../components/ui/table'
 import { content } from '../../components/ui/content.stylex'
+import { motion } from '../../motion.stylex'
+import { useValueChanged } from '../../motion'
 import { Link } from '../../router'
 import { evidenceFromEvent, simulateInvoicePayment } from './api'
 
 function money(pence: number): string {
   return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(pence / 100)
+}
+
+// Cross-fades its colour when the status changes and pulses once, so "paid" is seen to happen.
+function StatusPill({ invoice }: { invoice: InvoiceRow }) {
+  const changed = useValueChanged(`invoice-status:${invoice.id}`, invoice.status)
+  return <span {...stylex.props(content.status, motion.tinted, changed && motion.pulse)}>{invoice.status === 'paid' ? 'Paid' : 'Open'}</span>
 }
 
 function clientName(state: AppState, invoice: InvoiceRow): string {
@@ -50,7 +58,7 @@ export function Invoices({ state }: { state: AppState }) {
   const columns = [
     { key: 'client', label: 'Client', render: (invoice: InvoiceRow) => <Link to={`/app/invoices/${encodeURIComponent(invoice.id)}`} {...stylex.props(content.link)}>{clientName(state, invoice)}</Link> },
     { key: 'amount', label: 'Amount', mono: true, render: (invoice: InvoiceRow) => <Text role="mono">{money(invoice.total_pence)}</Text> },
-    { key: 'status', label: 'Status', render: (invoice: InvoiceRow) => <span {...stylex.props(content.status)}>{invoice.status === 'paid' ? 'Paid' : 'Open'}</span> },
+    { key: 'status', label: 'Status', render: (invoice: InvoiceRow) => <StatusPill invoice={invoice} /> },
     { key: 'created', label: 'Created', mono: true, render: (invoice: InvoiceRow) => <Text role="mono">{new Date(invoice.created_at).toLocaleDateString('en-GB')}</Text> },
   ]
   return (
@@ -109,7 +117,7 @@ export function InvoiceDetail({ state, invoiceId, onRefresh }: { state: AppState
       {paymentError ? <p role="alert" {...stylex.props(content.error)}>{paymentError}</p> : null}
       <div id="invoice-amount"><StatStrip items={[
         { label: 'Amount', value: money(invoice.total_pence), mono: true },
-        { label: 'Status', value: paid ? 'Paid' : 'Open' },
+        { label: 'Status', value: <StatusPill invoice={invoice} /> },
         { label: 'Client', value: client },
         { label: 'Stripe invoice', value: invoice.stripe_invoice_id || 'Not created', mono: true },
       ]} /></div>

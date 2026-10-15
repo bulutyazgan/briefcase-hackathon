@@ -1,19 +1,45 @@
 import { useEffect, useState } from 'react'
 import * as stylex from '@stylexjs/stylex'
+import { Page, Opening, Section } from '../../components/ui/page'
+import { StatStrip } from '../../components/ui/stat-strip'
+import { Table, type TableColumn } from '../../components/ui/table'
+import { Text } from '../../components/ui/text'
+import { content } from '../../components/ui/content.stylex'
+import { motion } from '../../motion.stylex'
+import { useFreshIds } from '../../motion'
 import { fetchBooks, journalsCsvUrl, type InvoiceBooks } from './api'
-import { styles } from './books.stylex'
 
 const MIN_MARGIN_RATIO = 0.4
 
-function formatMoney(amountPence: number): string {
-  return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(amountPence / 100)
+function money(pence: number): string {
+  return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(pence / 100)
 }
 
-const columns = ['Invoice', 'Net', 'VAT', 'Gross', 'Cost of sale', 'Margin', 'Status'] as const
+const columns: TableColumn<InvoiceBooks>[] = [
+  { key: 'invoice', label: 'Invoice', mono: true, render: (row) => <Text role="mono">{row.reference}</Text> },
+  { key: 'net', label: 'Net', mono: true, render: (row) => <Text role="mono">{money(row.netPence)}</Text> },
+  { key: 'vat', label: 'VAT', mono: true, render: (row) => <Text role="mono">{money(row.vatPence)}</Text> },
+  { key: 'gross', label: 'Gross', mono: true, render: (row) => <Text role="mono">{money(row.grossPence)}</Text> },
+  { key: 'cost', label: 'Cost of sale', mono: true, render: (row) => <Text role="mono">{money(row.costPence)}</Text> },
+  {
+    key: 'margin',
+    label: 'Margin',
+    mono: true,
+    render: (row) => (
+      <span {...stylex.props(content.clauseList)}>
+        <Text role="mono">{money(row.marginPence)}{row.marginRatio !== null ? ` · ${Math.round(row.marginRatio * 100)}%` : ''}</Text>
+        {row.marginRatio !== null && row.marginRatio < MIN_MARGIN_RATIO ? <span {...stylex.props(content.tag)}>Low margin</span> : null}
+      </span>
+    ),
+  },
+  { key: 'status', label: 'Status', render: (row) => <span {...stylex.props(content.status)}>{row.paid ? 'Paid' : 'Open'}</span> },
+]
 
 export function Books() {
   const [invoices, setInvoices] = useState<InvoiceBooks[] | null>(null)
   const [error, setError] = useState('')
+  const rows = invoices ?? []
+  const fresh = useFreshIds('books', rows.map((invoice) => invoice.invoiceId))
 
   useEffect(() => {
     let alive = true
@@ -27,46 +53,36 @@ export function Books() {
     return () => { alive = false; clearInterval(timer) }
   }, [])
 
+  const sum = (pick: (row: InvoiceBooks) => number) => rows.reduce((total, row) => total + pick(row), 0)
+  const title = rows.length ? `${money(sum((row) => row.grossPence))} on the books` : 'Nothing on the books yet'
+
   return (
-    <section {...stylex.props(styles.panel)} aria-labelledby="books-title">
-      <header {...stylex.props(styles.header)}>
-        <div>
-          <h2 id="books-title" {...stylex.props(styles.title)}>Books</h2>
-          <p {...stylex.props(styles.subtitle)}>Double-entry journals · UK VAT 20% · margin per invoice</p>
-        </div>
-        <a href={journalsCsvUrl} {...stylex.props(styles.link)}>Export journals CSV</a>
-      </header>
-      {error && <p role="alert" {...stylex.props(styles.message, styles.warning)}>{error}</p>}
-      {invoices && !invoices.length && <p {...stylex.props(styles.message)}>Journals post when an invoice is finalised.</p>}
-      {invoices && invoices.length > 0 && (
-        <div {...stylex.props(styles.scroll)}>
-          <table {...stylex.props(styles.table)}>
-            <thead>
-              <tr>
-                {columns.map((column, index) => (
-                  <th key={column} scope="col" {...stylex.props(styles.cell, styles.headCell, index === 0 && styles.first)}>{column}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {invoices.map((invoice) => (
-                <tr key={invoice.invoiceId}>
-                  <td {...stylex.props(styles.cell, styles.first)}>{invoice.reference}</td>
-                  <td {...stylex.props(styles.cell)}>{formatMoney(invoice.netPence)}</td>
-                  <td {...stylex.props(styles.cell)}>{formatMoney(invoice.vatPence)}</td>
-                  <td {...stylex.props(styles.cell)}>{formatMoney(invoice.grossPence)}</td>
-                  <td {...stylex.props(styles.cell)}>{formatMoney(invoice.costPence)}</td>
-                  <td {...stylex.props(styles.cell, invoice.marginRatio !== null && invoice.marginRatio < MIN_MARGIN_RATIO ? styles.low : styles.good)}>
-                    {formatMoney(invoice.marginPence)}
-                    {invoice.marginRatio !== null && ` · ${Math.round(invoice.marginRatio * 100)}%`}
-                  </td>
-                  <td {...stylex.props(styles.cell)}>{invoice.paid ? 'Paid' : 'Open'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </section>
+    <Page>
+      <Opening
+        title={title}
+        lede="Double-entry journals, UK VAT at 20% and the margin on every invoice."
+        tools={<a href={journalsCsvUrl} {...stylex.props(content.link)}>Export journals CSV</a>}
+      />
+      <StatStrip items={[
+        { label: 'Invoices', value: rows.length, mono: true },
+        { label: 'Net billed', value: money(sum((row) => row.netPence)), mono: true },
+        { label: 'VAT', value: money(sum((row) => row.vatPence)), mono: true },
+        { label: 'Margin', value: money(sum((row) => row.marginPence)), mono: true },
+      ]} />
+      <Section title="Books" description="Journals post when an invoice is finalised">
+        {error ? <p role="alert" {...stylex.props(content.error)}>{error}</p> : null}
+        {rows.length
+          ? <Table
+              rows={rows}
+              columns={columns}
+              rowKey={(row) => row.invoiceId}
+              rowProps={(row) => {
+                const index = fresh.get(row.invoiceId)
+                return stylex.props(index !== undefined && motion.enterUp, index !== undefined && motion.staggerTight(index))
+              }}
+            />
+          : <div {...stylex.props(content.well)}><Text role="compact">Journals post when an invoice is finalised.</Text></div>}
+      </Section>
+    </Page>
   )
 }
