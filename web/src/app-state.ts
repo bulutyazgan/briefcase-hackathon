@@ -10,6 +10,7 @@ export interface AppSnapshot {
 let snapshot: AppSnapshot = { state: null, leads: null, error: '', leadsError: '' }
 let timer: number | null = null
 let requestActive = false
+let readOnlyMode: boolean | null = null
 const listeners = new Set<() => void>()
 
 function notify(): void {
@@ -35,11 +36,28 @@ export async function refreshState(): Promise<void> {
   }
 }
 
+export function setReadOnlyMode(readOnly: boolean): void {
+  if (readOnlyMode === readOnly) return
+  readOnlyMode = readOnly
+  if (timer !== null) {
+    window.clearInterval(timer)
+    timer = null
+  }
+  if (!listeners.size) return
+
+  void refreshState()
+  if (!readOnly) timer = window.setInterval(() => void refreshState(), 1000)
+}
+
+export function isReadOnlyMode(): boolean {
+  return readOnlyMode === true
+}
+
 export function subscribe(listener: () => void): () => void {
   listeners.add(listener)
-  if (listeners.size === 1) {
+  if (listeners.size === 1 && readOnlyMode !== null) {
     void refreshState()
-    timer = window.setInterval(() => void refreshState(), 1000)
+    if (!readOnlyMode) timer = window.setInterval(() => void refreshState(), 1000)
   }
   return () => {
     listeners.delete(listener)

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { isReadOnlyMode } from '../../app-state'
 import { Button } from '../../components/ui/button'
 import { Opening, Page, Section } from '../../components/ui/page'
 import { SkeletonBar, SkeletonSwap } from '../../components/ui/skeleton'
@@ -19,6 +20,7 @@ function isCompanyStatus(value: unknown): value is CompanyStatus {
 }
 
 async function requestCompany(method: 'GET' | 'POST'): Promise<CompanyStatus> {
+  if (method === 'POST' && isReadOnlyMode()) throw new Error('This demo is read-only.')
   const response = await fetch(method === 'GET' ? '/api/company' : '/api/company/learn', { method })
   const body: unknown = await response.json()
   if (!response.ok || !isCompanyStatus(body)) throw new Error('Company data is not available.')
@@ -32,7 +34,7 @@ function sectionsOf(markdown: string): { title: string; lines: string[] }[] {
   })
 }
 
-export function Company() {
+export function Company({ readOnly }: { readOnly: boolean }) {
   const [status, setStatus] = useState<CompanyStatus | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [learning, setLearning] = useState(false)
@@ -42,6 +44,7 @@ export function Company() {
   }, [])
 
   async function learn() {
+    if (readOnly) return
     setLearning(true)
     try {
       setStatus(await requestCompany('POST'))
@@ -60,7 +63,7 @@ export function Company() {
       <Opening
         title={status?.name ?? 'Company'}
         lede="What Tally knows about the business it sells for. Onboarded once, held in Cognee, recalled in every client chat."
-        tools={<Button onClick={learn} disabled={learning}>{learning ? 'Learning…' : 'Re-learn into Cognee'}</Button>}
+        tools={readOnly ? undefined : <Button onClick={learn} disabled={learning}>{learning ? 'Learning…' : 'Re-learn into Cognee'}</Button>}
       />
       <StatStrip items={[
         { label: 'Memory', value: status ? `Cognee · ${status.dataset}` : '—' },

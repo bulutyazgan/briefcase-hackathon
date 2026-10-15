@@ -1,8 +1,8 @@
 import * as stylex from '@stylexjs/stylex'
-import { useState, useSyncExternalStore } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
 import type { AppState, SourcedLead } from './api'
-import { getSnapshot, refreshState, subscribe } from './app-state'
+import { getSnapshot, refreshState, setReadOnlyMode, subscribe } from './app-state'
 import { AppShell } from './components/layout/app-shell'
 import { Button } from './components/ui/button'
 import { content } from './components/ui/content.stylex'
@@ -20,6 +20,7 @@ import { Leads } from './features/leads/view'
 import { Notifications, notificationsOf } from './features/notifications/view'
 import { Company } from './features/company/view'
 import { motion } from './motion.stylex'
+import { useControlStatus } from './features/control/use-control-status'
 import { navigate, usePath } from './router'
 
 type Route =
@@ -114,14 +115,14 @@ function NotFound() {
   return <Page><Opening title="This page is not available" lede="Choose a page from the sidebar to continue." /></Page>
 }
 
-function RouteContent({ route, state, leads, onRefresh }: { route: Route; state: AppState; leads: SourcedLead[]; onRefresh: () => void }) {
-  if (route.page === 'inbox') return <Inbox state={state} onRefresh={onRefresh} />
+function RouteContent({ route, state, leads, onRefresh, readOnly }: { route: Route; state: AppState; leads: SourcedLead[]; onRefresh: () => void; readOnly: boolean }) {
+  if (route.page === 'inbox') return <Inbox state={state} onRefresh={onRefresh} readOnly={readOnly} />
   if (route.page === 'invoices') return <Invoices state={state} />
   if (route.page === 'leads') return <Leads state={state} leads={leads} />
-  if (route.page === 'invoice-detail') return <InvoiceDetail state={state} invoiceId={route.invoiceId} onRefresh={onRefresh} />
+  if (route.page === 'invoice-detail') return <InvoiceDetail state={state} invoiceId={route.invoiceId} onRefresh={onRefresh} readOnly={readOnly} />
   if (route.page === 'audit') return <Audit state={state} />
   if (route.page === 'notifications') return <Notifications state={state} />
-  if (route.page === 'company') return <Company />
+  if (route.page === 'company') return <Company readOnly={readOnly} />
   return <Policy state={state} />
 }
 
@@ -135,6 +136,7 @@ function StandalonePage({ route, state }: { route: Route; state: AppState | null
 
 export function App() {
   const path = usePath()
+  const control = useControlStatus()
   const { state, leads, error, leadsError } = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
   const route = resolveRoute(path)
   const index = pageIndex(route)
@@ -146,6 +148,9 @@ export function App() {
       key: transition.key + 1,
     })
   }
+  useEffect(() => {
+    if (control.loaded) setReadOnlyMode(control.status?.readOnly ?? false)
+  }, [control.loaded, control.status?.readOnly])
   if (path === '/app') {
     navigate('/app/inbox')
     return null
@@ -156,15 +161,16 @@ export function App() {
   const needsState = !standalone
   const routeError = route.page === 'leads' ? leadsError : error
   const loading = needsState && (!state || (route.page === 'leads' && !leads)) && !routeError && !error
+  const readOnly = control.status?.readOnly ?? false
   const contentToRender = standalone
     ? <StandalonePage route={route} state={state} />
     : routeError || error
       ? <PageSkeleton route={route} error onRetry={() => void refreshState()} />
       : state
-        ? <RouteContent route={route} state={state} leads={leads ?? []} onRefresh={() => void refreshState()} />
+        ? <RouteContent route={route} state={state} leads={leads ?? []} onRefresh={() => void refreshState()} readOnly={readOnly} />
         : <PageSkeleton route={route} error={false} onRetry={() => void refreshState()} />
 
-  return <AppShell path={path} invoiceCount={invoiceCount} pendingCount={pendingCount} leadsCount={leads?.length ?? 0} notificationCount={state ? notificationsOf(state).length : 0}>
+  return <AppShell path={path} invoiceCount={invoiceCount} pendingCount={pendingCount} leadsCount={leads?.length ?? 0} notificationCount={state ? notificationsOf(state).length : 0} readOnly={readOnly}>
     <SkeletonSwap loading={loading} skeleton={<PageSkeleton route={route} error={false} onRetry={() => void refreshState()} />}>
       <div key={transition.key} {...stylex.props(transition.direction > 0 && motion.pageForward, transition.direction < 0 && motion.pageBack)}>
         {contentToRender}

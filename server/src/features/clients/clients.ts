@@ -19,7 +19,7 @@ export const CLIENTS: readonly Client[] = [
     source: 'seed',
     aliases: ['louis'],
     pricePerLeadPence: 400,
-    billingEmail: 'lelouis.lnv@gmail.com',
+    billingEmail: process.env.DEMO_BILLING_EMAIL ?? 'louis@example.com',
     accountOwner: 'Bulut',
   },
   {

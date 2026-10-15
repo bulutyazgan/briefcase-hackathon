@@ -91,7 +91,7 @@ export function Invoices({ state }: { state: AppState }) {
   )
 }
 
-export function InvoiceDetail({ state, invoiceId, onRefresh }: { state: AppState; invoiceId: string; onRefresh: () => void }) {
+export function InvoiceDetail({ state, invoiceId, onRefresh, readOnly }: { state: AppState; invoiceId: string; onRefresh: () => void; readOnly: boolean }) {
   const invoice = state.invoices.find((item) => item.id === invoiceId)
   const [paying, setPaying] = useState(false)
   const [paymentError, setPaymentError] = useState('')
@@ -105,7 +105,7 @@ export function InvoiceDetail({ state, invoiceId, onRefresh }: { state: AppState
   const invoicePath = `/api/invoices/${encodeURIComponent(invoice.id)}/pdf`
 
   async function pay(): Promise<void> {
-    if (paying || paid) return
+    if (readOnly || paying || paid) return
     setPaying(true)
     setPaymentError('')
     try {
@@ -124,9 +124,9 @@ export function InvoiceDetail({ state, invoiceId, onRefresh }: { state: AppState
         title={paid ? `${money(invoice.total_pence)} collected from ${client}` : `${money(invoice.total_pence)} awaiting payment`}
         lede="The invoice, client agreement and policy decision are linked in one record."
         tools={<>
-          {invoice.hosted_url ? <a href={invoice.hosted_url} target="_blank" rel="noreferrer" {...stylex.props(content.link)}>View Stripe invoice</a> : null}
+          {!readOnly && invoice.hosted_url ? <a href={invoice.hosted_url} target="_blank" rel="noreferrer" {...stylex.props(content.link)}>View Stripe invoice</a> : null}
           <a href={invoicePath} download={`invoice-${invoice.id}.pdf`} {...stylex.props(content.link, content.iconLabel)}><HugeiconsIcon icon={Download01Icon} size={16} strokeWidth={1.5} aria-hidden="true" {...stylex.props(content.icon)} />Download PDF</a>
-          <Button variant="primary" disabled={paid || paying || !invoice.stripe_invoice_id} onClick={() => void pay()}><span {...stylex.props(content.iconLabel)}><HugeiconsIcon icon={CreditCardIcon} size={16} strokeWidth={1.5} aria-hidden="true" {...stylex.props(content.icon)} />{paying ? 'Processing payment' : 'Pay as client (test card)'}</span></Button>
+          {!readOnly ? <Button variant="primary" disabled={paid || paying || !invoice.stripe_invoice_id} onClick={() => void pay()}><span {...stylex.props(content.iconLabel)}><HugeiconsIcon icon={CreditCardIcon} size={16} strokeWidth={1.5} aria-hidden="true" {...stylex.props(content.icon)} />{paying ? 'Processing payment' : 'Pay as client (test card)'}</span></Button> : null}
         </>}
       />
       {paid ? <Text role="compact">This invoice is already paid.</Text> : null}

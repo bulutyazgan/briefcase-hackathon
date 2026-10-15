@@ -6,6 +6,10 @@ This build is the lead-gen agency instance: Tally sits in the client channel, he
 
 Built for the Stripe x Briefcase AI FinTech Hackathon, London, 15 Oct 2026. Track 02, Agents that collect.
 
+## Live demo
+
+The hosted site is a read-only replay of a recorded run. To use the live agent, run Tally locally with your own keys from `server/.env.example`.
+
 ## Name
 
 Tally is the working title. The product name is Tally in the code, the UI, and these docs.
