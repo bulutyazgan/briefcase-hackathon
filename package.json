@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "concurrently -k -n server,web \"bun run --cwd=server dev\" \"bun run --cwd=web dev\"",
     "seed": "bun run --cwd=server seed",
+    "demo:seed": "bun run --cwd=server demo:seed",
     "pdf:sample": "bun run --cwd=server pdf:sample",
     "typecheck": "bun run --filter '*' typecheck",
     "build": "bun run --cwd=web build",

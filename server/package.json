@@ -4,6 +4,7 @@
   "scripts": {
     "dev": "bun --watch src/index.ts",
     "seed": "bun src/seed.ts",
+    "demo:seed": "bun src/demo-seed.ts",
     "typecheck": "tsc --noEmit",
     "pdf:sample": "bun src/sample-pdf.tsx"
   },

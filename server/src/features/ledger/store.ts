@@ -178,8 +178,8 @@ export function listInvoiceAuthors(): string[] {
 export function insertMessage(message: ChannelMessage): ChannelMessage {
   database.query(`
     INSERT OR IGNORE INTO messages (id, channel, thread, author, text, ts, processed_at)
-    VALUES (?, ?, ?, ?, ?, ?, NULL)
-  `).run(message.id, message.channel, message.thread, message.author, message.text, message.ts)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(message.id, message.channel, message.thread, message.author, message.text, message.ts, message.processed_at)
   return getMessage(message.id) ?? message
 }
 
@@ -254,6 +254,12 @@ export function saveInvoice(invoice: Omit<InvoiceRow, 'created_at'>): void {
     invoice.hosted_url,
     invoice.pdf_path,
   )
+}
+
+// Seeds only: moves an invoice into the past so the collections role sees it as overdue.
+export function backdateInvoice(invoiceId: string, createdAt: Date): void {
+  database.query('UPDATE invoices SET created_at = ? WHERE id = ?')
+    .run(createdAt.toISOString().slice(0, 19).replace('T', ' '), invoiceId)
 }
 
 export function updateInvoice(invoiceId: string, status: string, hostedUrl?: string, pdfPath?: string): void {
