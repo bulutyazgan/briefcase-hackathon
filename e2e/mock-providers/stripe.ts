@@ -270,6 +270,12 @@ export async function handleStripe(request: Request, url: URL, mockBase: string)
     }
     return remember(invoice)
   }
+  // Stripe emails the hosted invoice; the mock just acknowledges it.
+  if ((match = path.match(/^\/v1\/invoices\/([^/]+)\/send$/)) && post) {
+    const invoice = findInvoice(match[1] ?? '')
+    if (!invoice) return stripeError(404, 'invalid_request_error', 'No such invoice', 'resource_missing')
+    return remember(invoice)
+  }
   if ((match = path.match(/^\/v1\/invoices\/([^/]+)\/pay$/)) && post) {
     const invoice = payInvoice(match[1] ?? '')
     if (!invoice) return stripeError(404, 'invalid_request_error', 'No such invoice', 'resource_missing')
