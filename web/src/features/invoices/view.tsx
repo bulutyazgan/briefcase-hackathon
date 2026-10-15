@@ -12,6 +12,7 @@ import { Text } from '../../components/ui/text'
 import { content } from '../../components/ui/content.stylex'
 import { Link, navigate } from '../../router'
 import { evidenceFromEvent, simulateInvoicePayment } from './api'
+import type { InvoiceEvidence } from './api'
 
 function money(pence: number): string {
   return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(pence / 100)
@@ -24,6 +25,25 @@ function clientName(state: AppState, invoice: InvoiceRow): string {
 
 function decisionEvent(state: AppState, invoice: InvoiceRow): EventRow | undefined {
   return state.events.find((event) => event.message_id === invoice.message_id && (event.step === 'decide' || event.data_json.includes('"decision"')))
+}
+
+function planChangeEvidence(event: EventRow | undefined, totalPence: number): InvoiceEvidence[] {
+  if (!event) return []
+  try {
+    const data: unknown = JSON.parse(event.data_json)
+    if (data === null || typeof data !== 'object' || Array.isArray(data)) return []
+    const from = 'from' in data ? data.from : undefined
+    const to = 'to' in data ? data.to : undefined
+    const quote = 'quote' in data ? data.quote : undefined
+    if (typeof from !== 'string' || typeof to !== 'string' || typeof quote !== 'string') return []
+    return [{
+      quote,
+      memoryFact: `Changed from ${from} to ${to}. Amount: ${money(totalPence)} per ${to === 'yearly' ? 'year' : 'month'}.`,
+      clauses: ['P2', 'P5', 'P8'],
+    }]
+  } catch {
+    return []
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -90,8 +110,11 @@ export function InvoiceDetail({ state, invoiceId, onRefresh, readOnly }: { state
   if (!invoice) {
     return <Page><Opening title="This invoice is not in the ledger" lede="Check the invoice URL or return to the invoice list." tools={<Link to="/app/invoices" {...stylex.props(content.link)}>View invoices</Link>} /></Page>
   }
-  const event = decisionEvent(state, invoice)
-  const evidence = evidenceFromEvent(event)
+  const decision = decisionEvent(state, invoice)
+  const planChange = decision ? undefined : state.events.find((event) => event.message_id === invoice.message_id && event.step === 'plan_change')
+  const event = decision ?? planChange
+  const evidence = decision ? evidenceFromEvent(decision) : planChangeEvidence(planChange, invoice.total_pence)
+  const evidenceLabel = planChange ? 'Plan change' : 'Remembered agreement'
   const client = clientName(state, invoice)
   const paid = invoice.status === 'paid'
   const invoicePath = `/api/invoices/${encodeURIComponent(invoice.id)}/pdf`
@@ -137,7 +160,7 @@ export function InvoiceDetail({ state, invoiceId, onRefresh, readOnly }: { state
           {evidence.length ? (
             <div {...stylex.props(content.stack)}>
               <div id="evidence-quote" {...stylex.props(content.evidence)}><Text role="label">Client quote</Text><Text role="compact">“{evidence[0].quote}”</Text></div>
-              <div id="evidence-memory" {...stylex.props(content.evidence)}><Text role="label">Remembered agreement</Text><Text role="compact">{evidence[0].memoryFact}</Text></div>
+              <div id="evidence-memory" {...stylex.props(content.evidence)}><Text role="label">{evidenceLabel}</Text><Text role="compact">{evidence[0].memoryFact}</Text></div>
               <div {...stylex.props(content.evidence)}><Text role="label">Arithmetic</Text><span {...stylex.props(content.math)}>{arithmetic(event, invoice.total_pence)}</span></div>
               <div {...stylex.props(content.evidence)}><Text role="label">Policy clauses</Text><div {...stylex.props(content.clauseList)}>{evidence[0].clauses.map((clause) => <Link key={clause} to={`/app/policy#policy-${clause}`} {...stylex.props(content.clause)}>{clause}</Link>)}</div></div>
             </div>

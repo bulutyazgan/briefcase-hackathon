@@ -6,9 +6,9 @@ const attribution = 'AICSS free component pattern · https://www.aicss.dev/compo
 
 export type ThoughtStep = { name: string; detail: string }
 
-export function ThinkingReasoning({ seconds, steps }: { seconds: number; steps: ThoughtStep[] }) {
+export function ThinkingReasoning({ seconds, steps, open = false }: { seconds: number; steps: ThoughtStep[]; open?: boolean }) {
   return (
-    <details title={attribution} {...stylex.props(styles.details)}>
+    <details title={attribution} open={open} {...stylex.props(styles.details)}>
       <summary {...stylex.props(styles.summary)}>Thought for {Math.max(1, seconds)} s</summary>
       <ol {...stylex.props(styles.list)}>
         {steps.map((step, index) => <li key={`${step.name}-${index}`} {...stylex.props(styles.step)}><strong {...stylex.props(styles.stepName)}>{step.name}</strong>{step.detail ? ` · ${step.detail}` : ''}</li>)}

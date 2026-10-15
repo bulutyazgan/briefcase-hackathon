@@ -37,30 +37,40 @@ function messageEvents(state: AppState, message: ChannelMessage) {
     .sort((left, right) => left.created_at.localeCompare(right.created_at))
 }
 
-function stepName(step: string): string | null {
-  if (step === 'extract') return 'extract'
-  if (step === 'recall') return 'recall'
-  if (step === 'size' || step === 'leads' || step === 'lead_sizing' || step === 'source_leads') return 'source leads'
-  if (step === 'price') return 'price'
-  if (step === 'decide' || step === 'policy') return 'policy'
-  if (step === 'billing' || step === 'bill') return 'bill'
-  if (step === 'client_identified') return 'identify client'
-  if (step === 'converse') return 'respond'
-  if (step === 'plan_change') return 'plan change'
-  if (step === 'staff_note') return 'staff note'
-  return step.replaceAll('_', ' ')
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
 
-function AgentReasoning({ state, message, events: providedEvents }: { state: AppState; message: ChannelMessage; events?: EventRow[] }) {
+function stepName(event: EventRow): string {
+  if (event.step === 'extract') return 'Understood the request'
+  if (event.step === 'recall') return 'Recalled from memory'
+  if (event.step === 'size' || event.step === 'leads' || event.step === 'lead_sizing' || event.step === 'source_leads') return 'Sourced leads'
+  if (event.step === 'price') return 'Checked the price'
+  if (event.step === 'decide' || event.step === 'policy') return 'Checked policy'
+  if (event.step === 'billing' || event.step === 'bill') return 'Created invoice'
+  if (event.step === 'client_identified') return 'Found client in CRM'
+  if (event.step === 'converse') return 'Replied to client'
+  if (event.step === 'staff_note') return 'Noted for staff'
+  if (event.step === 'company_learned') return 'Learned company details'
+  if (event.step === 'plan_change') {
+    try {
+      const data: unknown = JSON.parse(event.data_json)
+      if (isRecord(data) && typeof data.to === 'string') return `Switched to ${data.to}`
+    } catch {
+      return 'Changed the plan'
+    }
+    return 'Changed the plan'
+  }
+  return event.step.replaceAll('_', ' ').replace(/(^\w|\s\w)/g, (word) => word.toUpperCase())
+}
+
+function AgentReasoning({ state, message, events: providedEvents, open = false }: { state: AppState; message: ChannelMessage; events?: EventRow[]; open?: boolean }) {
   const events = providedEvents ?? messageEvents(state, message)
-  const steps = events.flatMap((event) => {
-    const name = stepName(event.step)
-    return name ? [{ name, detail: event.summary }] : []
-  })
+  const steps = events.map((event) => ({ name: stepName(event), detail: event.summary }))
   if (!steps.length) return null
   const start = Date.parse(events[0].created_at)
   const end = Date.parse(events[events.length - 1].created_at)
-  return <ThinkingReasoning seconds={Math.max(1, Math.round((end - start) / 1000))} steps={steps} />
+  return <ThinkingReasoning seconds={Math.max(1, Math.round((end - start) / 1000))} steps={steps} open={open} />
 }
 
 type ReplayItem =
@@ -107,10 +117,15 @@ function replayItemsFor(state: AppState): { threadId: string | null; messages: C
       message,
     }] : []
   })
-  const items = [...messageItems, ...eventItems].sort((left, right) =>
+  const compareItems = (left: ReplayItem, right: ReplayItem) =>
     left.timestamp.localeCompare(right.timestamp)
-    || (left.kind === right.kind ? left.key.localeCompare(right.key) : left.kind === 'message' ? -1 : 1),
-  )
+    || (left.kind === right.kind ? left.key.localeCompare(right.key) : left.kind === 'message' ? -1 : 1)
+  const conversationItems = [
+    ...messageItems.filter((item) => item.kind === 'message' && !isTally(item.message)),
+    ...eventItems,
+  ].sort(compareItems)
+  const tallyItems = messageItems.filter((item) => item.kind === 'message' && isTally(item.message)).sort(compareItems)
+  const items = [...conversationItems, ...tallyItems]
   return { threadId, messages, items }
 }
 
@@ -148,10 +163,10 @@ function ReplayEvent({ state, event, message }: { state: AppState; event: EventR
   return (
     <article {...stylex.props(content.message, content.agentMessage)}>
       <div {...stylex.props(content.messageTop)}>
-        <Text role="label">Recorded step</Text>
+        <Text role="label">{stepName(event)}</Text>
         <span {...stylex.props(content.timestamp)}>{new Date(event.created_at).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' })}</span>
       </div>
-      <AgentReasoning state={state} message={message} events={[event]} />
+      <AgentReasoning state={state} message={message} events={[event]} open />
     </article>
   )
 }
@@ -192,6 +207,9 @@ export function Inbox({ state, onRefresh, readOnly }: { state: AppState; onRefre
   const title = pending.length
     ? pendingAmount > 0 ? `${money(pendingAmount)} awaiting your approval` : `${pending.length} approval${pending.length === 1 ? '' : 's'} waiting for review`
     : state.invoices.length ? `${state.invoices.length} invoice${state.invoices.length === 1 ? '' : 's'} in the ledger` : 'Your client commitments are in one place'
+  const sectionDescription = readOnly && channel.toLowerCase().startsWith('telegram')
+    ? 'Recorded Telegram conversation'
+    : 'Simulator thread and agent responses'
 
   useEffect(() => {
     const preference = window.matchMedia('(prefers-reduced-motion: reduce)')
@@ -285,7 +303,7 @@ export function Inbox({ state, onRefresh, readOnly }: { state: AppState; onRefre
         { label: 'Outstanding', value: money(outstanding), mono: true },
       ]} />
       <div {...stylex.props(content.twoCol)}>
-        <Section title="Client channel" description="Simulator thread and agent responses">
+        <Section title="Client channel" description={sectionDescription}>
           <div {...stylex.props(content.card, content.stack)}>
             <div {...stylex.props(content.row)}><Text role="label">{channel}</Text><span {...stylex.props(content.tag)}>{readOnly ? 'Recorded run' : 'Live updates'}</span></div>
             <div {...stylex.props(content.thread)} aria-live="polite">
