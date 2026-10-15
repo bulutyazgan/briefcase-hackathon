@@ -1,7 +1,8 @@
 import Stripe from 'stripe'
 import type { BillableIntent, Decision } from '../policy/decide'
 import { findClient } from '../clients/clients'
-import { listInvoices, saveInvoice } from '../ledger/store'
+import { getMessage, listInvoices, saveInvoice } from '../ledger/store'
+import { extractPoNumber } from '../buyer/policy'
 
 export class BillingBlockedError extends Error {}
 
@@ -59,11 +60,13 @@ export async function createInvoice(
     }`,
   }, { idempotencyKey: `invoice-item-${messageId}-${index}` })))
 
+  const poNumber = extractPoNumber(getMessage(messageId)?.text ?? intent.ask)
   const invoice = await stripe.invoices.create({
     customer: customer.id,
     collection_method: 'send_invoice',
     days_until_due: 7,
-    metadata: { message_id: messageId, decision_clauses: decision.clauses.join(',') },
+    metadata: { message_id: messageId, decision_clauses: decision.clauses.join(','), ...(poNumber ? { po_number: poNumber } : {}) },
+    ...(poNumber ? { description: `Purchase order ${poNumber}` } : {}),
   }, { idempotencyKey: `invoice-${messageId}` })
   const finalized = await stripe.invoices.finalizeInvoice(invoice.id, {}, {
     idempotencyKey: `finalize-${messageId}`,

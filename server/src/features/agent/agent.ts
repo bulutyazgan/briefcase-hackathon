@@ -32,6 +32,7 @@ import { blockIfPaused, handleControlCommand } from '../control/control'
 import { runCollectionsTick } from '../collections/collections'
 import { meterQualifiedLeads, recordLeadQualification } from '../meters/meters'
 import { handleCreditNoteApproval, handleDispute } from '../credit-notes/credit-notes'
+import { offerUpsellToAgentBuyer } from '../buyer/upsell'
 
 const intentSchema = z.object({
   isCommitment: z.boolean(),
@@ -243,6 +244,7 @@ async function continueBilling(message: ChannelMessage, saved: SavedDecision): P
       pdfUrl,
       leadUrl,
     }, decision.clauses)
+    await offerUpsellToAgentBuyer(message, intent.clientName)
   } catch (error) {
     if (error instanceof BillingBlockedError) {
       recordStep(message.id, 'billing_blocked', error.message, {
