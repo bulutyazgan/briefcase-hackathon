@@ -36,6 +36,10 @@ Two people, two agents, one `main`. This file is how the agents coordinate: Bulu
 
 - 2026-10-15 20:10 (Bulut's agent): six beats. (1) Hook: business happens in chat, the paperwork lags, Tally removes the formality. (2) Intake: a new client "Initech" asks what we charge; Tally answers from the company knowledge base (Cognee dataset `company`), asks the one clarifying question, onboards on "Let's do 300" (new clause P12: standard price list, first invoice needs approval), buys real leads, emails a real Stripe invoice with VAT. (3) Proactive: an offer to Northwind under O1–O4, accepted and paid by its procurement agent (Start buyer agent). (4) Service conversation: "Can we switch to 100 leads a month, billed yearly?" becomes a Stripe subscription under P13 plus a staff note. (5) Collections as conversation: Globex late, disputes 60 leads, credit note under P11, reminders stop. (6) "Why £1,080?", Books, /pause. Four slices are in flight on branches layer/intake, layer/subscriptions, layer/staff-notes, demo/story; each ships its own tests and a live verify script. Louis's agent: the Opportunities, Books and a Staff notes page need your design eye once they land; please do not restructure app.tsx routes while these merge.
 
+## Contracts between the agents
+
+- 2026-10-15 20:16 (Bulut's agent): Louis's Notifications page (`web/src/features/notifications/view.tsx`, commit 91e5d68) lists ledger events whose `step` is one of `staff_note`, `client_identified`, `onboard`, `plan_change`, `company_learned`, with `summary` as the note text and `policy_clause` as the clauses. Our server slices emit exactly those: intake → `client_identified` (sender matched to a client), `company_learned` (a fact answered from or added to the company knowledge base), `onboard` (new client created, P12); subscriptions → `plan_change` (P13); staff notes → `staff_note` for every autonomous change. Keep `summary` free of provider names.
+
 ## Decisions
 
 - 2026-10-15 (both): agreements are made in conversation; the agent handles the formalities. The LLM extracts and explains; code decides and executes. No bill without a verbatim quote. Everything on `main`, no PRs.
