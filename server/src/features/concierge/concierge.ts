@@ -7,7 +7,7 @@ import { reply } from '../channels/channel'
 import { sendTelegramPdf } from '../channels/telegram'
 import { findClient, type Client } from '../clients/clients'
 import { recallFacts, recallSeededFacts, searchCogneeDataset } from '../memory/memory'
-import { readCompanyKnowledge } from '../company/company'
+import { COMPANY_DATASET, readCompanyKnowledge } from '../company/company'
 import { renderInvoicePdf } from '../invoice-pdf/render'
 
 // Customer-service conversation. The LLM writes the reply and extracts a plan
@@ -88,7 +88,7 @@ export async function converse(message: ChannelMessage): Promise<void> {
   const facts = client
     ? await recallFacts(client.name, message.text).catch(() => recallSeededFacts(client.name))
     : []
-  const cogneeHits = await searchCogneeDataset('company', message.text, { topK: 5, timeoutMs: 4000 })
+  const cogneeHits = await searchCogneeDataset(COMPANY_DATASET, message.text, { topK: 5, timeoutMs: 4000 })
     .catch(() => null) ?? []
   if (client) step(message, 'client_identified', `Found ${client.name} in the CRM (${PLAN.label.toLowerCase()}, ${currentPlan}).`, { client: client.name, plan: currentPlan, facts }, ['P5'])
   const history = getState().messages.filter((entry) => entry.channel === message.channel && entry.id !== message.id).slice(-10)
