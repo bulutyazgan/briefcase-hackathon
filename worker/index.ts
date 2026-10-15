@@ -98,3 +98,5 @@ export async function fetch(request: Request, env: Env): Promise<Response> {
 
   return env.ASSETS.fetch(request)
 }
+
+export default { fetch }
