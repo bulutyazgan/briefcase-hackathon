@@ -7,7 +7,17 @@ import { startSlack } from './features/channels/slack'
 import { startTelegram } from './features/channels/telegram'
 import { handleApproval, startAgentLoop } from './features/agent/agent'
 import { BillingBlockedError, simulateInvoicePayment } from './features/billing/billing'
-import { getApproval, getEvent, getInvoice, getMessage, getState, listInvoices } from './features/ledger/store'
+import {
+  getApproval,
+  getEvent,
+  getInvoice,
+  getMessage,
+  getSetting,
+  getState,
+  listEventsByStep,
+  listInvoices,
+  setSetting,
+} from './features/ledger/store'
 import { leadsCsv } from './features/leads/leads'
 import { controlStatus } from './features/control/control'
 import { invoiceLeadRows } from './features/meters/meters'
@@ -17,6 +27,8 @@ import { stripePayments } from './features/buyer/providers/stripe-payments'
 import { getStripe } from './features/billing/billing'
 import { booksRoutes } from './features/books/routes'
 import { listOpportunityViews } from './features/opportunities/opportunities'
+import { companyStatus, learnCompany } from './features/company/company'
+import { seedClientMemoryToCognee } from './features/memory/memory'
 
 const leadSchema = z.object({
   name: z.string(),
@@ -50,6 +62,11 @@ const app = new Hono()
 
 app.get('/health', (context) => context.json({ status: 'ok' }))
 app.get('/api/state', (context) => context.json(getState()))
+app.get('/api/company', async (context) => context.json(await companyStatus()))
+app.post('/api/company/learn', async (context) => {
+  const learned = await learnCompany()
+  return context.json({ ...await companyStatus(), stored: learned.stored })
+})
 app.route('/api/channels', channelRoutes)
 app.route('/api/buyer', buyerRoutes)
 app.get('/api/control', (context) => context.json(controlStatus()))
@@ -141,6 +158,18 @@ app.get('/api/invoices/:id/pdf', async (context) => {
     'content-disposition': `inline; filename="tally-${invoiceId}.pdf"`,
   })
 })
+
+if (!listEventsByStep('company_learned').length) {
+  void learnCompany().catch((error: unknown) => console.error(`Company knowledge learning failed: ${String(error)}`))
+}
+
+if (getSetting('cognee_seed:louis') !== 'true') {
+  void seedClientMemoryToCognee('Louis')
+    .then((stored) => {
+      if (stored) setSetting('cognee_seed:louis', 'true')
+    })
+    .catch((error: unknown) => console.error(`Louis memory seeding failed: ${String(error)}`))
+}
 
 startAgentLoop()
 startBuyerLoop(() => stripePayments(getStripe()))

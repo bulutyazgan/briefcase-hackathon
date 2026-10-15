@@ -26,7 +26,7 @@ export interface CogneeConfig {
 export interface CogneeClient {
   add(dataset: string, text: string): Promise<void>
   cognify(dataset: string): Promise<void>
-  search(dataset: string, query: string): Promise<string[]>
+  search(dataset: string, query: string, options?: { topK?: number; signal?: AbortSignal }): Promise<string[]>
 }
 
 export function cogneeConfigFromEnv(): CogneeConfig | null {
@@ -78,11 +78,12 @@ export function createCogneeClient(config: CogneeConfig): CogneeClient {
         body: JSON.stringify({ datasets: [dataset], run_in_background: true }),
       })
     },
-    async search(dataset, query) {
+    async search(dataset, query, options = {}) {
       const response = await call('/api/v1/search', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ query, searchType: 'CHUNKS', datasets: [dataset], topK: 20 }),
+        body: JSON.stringify({ query, searchType: 'CHUNKS', datasets: [dataset], topK: options.topK ?? 20 }),
+        signal: options.signal,
       })
       return collectStrings(await response.json())
     },

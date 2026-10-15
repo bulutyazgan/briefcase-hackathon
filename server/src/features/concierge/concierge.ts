@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs'
 import { generateText, Output } from 'ai'
 import { createOpenAI } from '@ai-sdk/openai'
 import { z } from 'zod'
@@ -7,13 +6,13 @@ import { getStripe } from '../billing/billing'
 import { reply } from '../channels/channel'
 import { sendTelegramPdf } from '../channels/telegram'
 import { findClient, type Client } from '../clients/clients'
-import { recallSeededFacts } from '../memory/memory'
+import { recallFacts, recallSeededFacts, searchCogneeDataset } from '../memory/memory'
+import { readCompanyKnowledge } from '../company/company'
 import { renderInvoicePdf } from '../invoice-pdf/render'
 
 // Customer-service conversation. The LLM writes the reply and extracts a plan
 // change request; code checks P5/P8 and the rate card, then bills.
 
-const companyKnowledge = readFileSync(new URL('../../../seed/company.md', import.meta.url), 'utf8')
 const PLAN = { label: 'Website care plan', monthlyPence: 50000, yearlyPence: 500000 } as const
 
 const outputSchema = z.object({
@@ -86,7 +85,11 @@ async function billYearly(message: ChannelMessage, client: Client, quote: string
 export async function converse(message: ChannelMessage): Promise<void> {
   const client = resolveClient(message)
   const currentPlan = client ? getSetting(`plan:${client.name}`) ?? 'monthly' : null
-  const facts = client ? await recallSeededFacts(client.name) : []
+  const facts = client
+    ? await recallFacts(client.name, message.text).catch(() => recallSeededFacts(client.name))
+    : []
+  const cogneeHits = await searchCogneeDataset('company', message.text, { topK: 5, timeoutMs: 4000 })
+    .catch(() => null) ?? []
   if (client) step(message, 'client_identified', `Found ${client.name} in the CRM (${PLAN.label.toLowerCase()}, ${currentPlan}).`, { client: client.name, plan: currentPlan, facts }, ['P5'])
   const history = getState().messages.filter((entry) => entry.channel === message.channel && entry.id !== message.id).slice(-10)
   const apiKey = process.env.OPENAI_API_KEY
@@ -105,7 +108,8 @@ export async function converse(message: ChannelMessage): Promise<void> {
             : 'This person is not in the CRM yet. Learn what they need and offer a fitting service with its price band. Ask for their company name and billing email.',
           'Set planChange only if the client explicitly asks to switch the care plan billing to yearly or monthly. If yearly, say you have noted the change and that the invoice follows below; do not write a link.',
           'quote must be the exact words from the client message that state the request, or empty.',
-          `Company knowledge:\n${companyKnowledge}`,
+          `Company knowledge:\n${readCompanyKnowledge()}`,
+          `Cognee company context:\n${cogneeHits.join('\n') || '- none'}`,
           `Client memory:\n${facts.map((fact) => `- ${fact.date}: ${fact.fact}`).join('\n') || '- none'}`,
           `Recent conversation:\n${history.map((entry) => `${entry.author}: ${entry.text}`).join('\n') || '(new conversation)'}`,
           `Client message from ${message.author}: ${message.text}`,
@@ -117,7 +121,12 @@ export async function converse(message: ChannelMessage): Promise<void> {
     }
   }
   const quote = output.quote && message.text.includes(output.quote) ? output.quote : message.text
-  step(message, 'converse', 'Answered the client in chat.', { reply: output.reply, planChange: output.planChange, client: client?.name ?? null })
+  step(message, 'converse', 'Answered the client in chat.', {
+    reply: output.reply,
+    planChange: output.planChange,
+    client: client?.name ?? null,
+    cogneeHits,
+  })
   let text = output.reply
   if (output.planChange === 'yearly') {
     if (!client) text = `${text}\n\nI could not find your account yet. Tell me your name or company and I will switch it straight away (P5).`
