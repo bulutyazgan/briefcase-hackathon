@@ -30,6 +30,7 @@ import { sourcingCapMicro } from '../pricing/pricing'
 import { renderInvoicePdf } from '../invoice-pdf/render'
 import { blockIfPaused, handleControlCommand } from '../control/control'
 import { runCollectionsTick } from '../collections/collections'
+import { meterQualifiedLeads, recordLeadQualification } from '../meters/meters'
 
 const intentSchema = z.object({
   isCommitment: z.boolean(),
@@ -199,6 +200,7 @@ async function continueBilling(message: ChannelMessage, saved: SavedDecision): P
       totalPence: decision.totalPence,
       idempotencyKey: message.id,
     }, decision.clauses)
+    await meterQualifiedLeads(message.id)
 
     let pdfPath: string | null = null
     try {
@@ -285,6 +287,7 @@ async function sourceAndBill(message: ChannelMessage, priced: SavedDecision): Pr
 
   const settled = settleOrder(intent, facts, discountTerms, requestedQuantity, sourcing)
   const leads: Lead[] = settled.leads.map(({ name, company, url }) => ({ name, company, url }))
+  recordLeadQualification(message.id, settled.leads)
   recordStep(message.id, 'size', `Sourced ${leads.length} of ${requestedQuantity} leads.`, {
     requested: requestedQuantity,
     found: leads.length,

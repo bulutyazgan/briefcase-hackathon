@@ -5,7 +5,7 @@ import { listInvoices, saveInvoice } from '../ledger/store'
 
 export class BillingBlockedError extends Error {}
 
-function getStripe(): Stripe {
+export function getStripe(): Stripe {
   const secretKey = process.env.STRIPE_SECRET_KEY
   if (!secretKey?.startsWith('sk_test_') && !secretKey?.startsWith('rk_test_')) {
     throw new BillingBlockedError('Stripe billing requires a key that starts with sk_test_ or rk_test_.')
