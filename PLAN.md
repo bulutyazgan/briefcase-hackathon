@@ -75,7 +75,7 @@ Lives in `server/policy/billing-policy.md` (human-readable, shown in the UI) and
 | --- | --- | --- |
 | Web | Vite + React 19 + TypeScript + StyleX (no Tailwind) | Louis's call; cf0 house style |
 | Server | Hono on Bun, `bun:sqlite` | Zero setup, one process, fast |
-| Agent | AI SDK + Fireworks model, tool loop with zod schemas | Key already available; typed extraction |
+| Agent | AI SDK + OpenAI model, tool loop with zod schemas | Key already available; typed extraction |
 | Memory | Cognee Cloud HTTP API (`/api/v1/add`, `/cognify`, `/search`, `X-Api-Key`) — one dataset per client. Local fallback store if no key | Sponsor stack + side quest |
 | Billing | Stripe test mode (`sk_test_…`): customers, invoice items, invoices, hosted invoice page | Track requirement |
 | PDF | pdfcn Forme blocks (`@pdfcn/forme/invoice-minimal`) on `@formepdf/react` | Louis's call; looks great on video |
@@ -127,7 +127,7 @@ Cut order if late: email → Slack (simulator only) → Firecrawl (seeded list) 
 
 ## 10. Environment
 
-`.env` in `server/` (never commit): `STRIPE_SECRET_KEY` (sk_test only), `FIREWORKS_API_KEY`, `FIRECRAWL_API_KEY`, `COGNEE_API_KEY` + `COGNEE_BASE_URL`, `SLACK_BOT_TOKEN` + `SLACK_APP_TOKEN` (Socket Mode), optional `AGENTMAIL_API_KEY`. `server/.env.example` lists them.
+`.env` in `server/` (never commit): `STRIPE_SECRET_KEY` (sk_test only), `OPENAI_API_KEY`, `OPENAI_MODEL` (default `gpt-5-mini`), `FIRECRAWL_API_KEY`, `COGNEE_API_KEY` + `COGNEE_BASE_URL`, `SLACK_BOT_TOKEN` + `SLACK_APP_TOKEN` (Socket Mode), optional `AGENTMAIL_API_KEY`. `server/.env.example` lists them.
 
 ## 11. Open questions
 

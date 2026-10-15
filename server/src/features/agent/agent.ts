@@ -1,5 +1,5 @@
-import { generateObject } from 'ai'
-import { createFireworks } from '@ai-sdk/fireworks'
+import { generateText, Output } from 'ai'
+import { createOpenAI } from '@ai-sdk/openai'
 import { z } from 'zod'
 import {
   getEvent,
@@ -79,47 +79,25 @@ function recordStep(
   })
 }
 
-function heuristicIntent(message: ChannelMessage): BillableIntent {
-  const quantityMatch = message.text.match(/\b(\d{1,5})\s+(?:fintech\s+)?(?:CFO\s+)?leads?\b/i)
-  const quantity = quantityMatch?.[1] ? Number(quantityMatch[1]) : null
-  const authorName = message.author.replace(/^Client\s+[—–-]\s*/i, '').trim()
-  const isClientMessage = /^Client(?:\s|$)/i.test(message.author) || message.channel.startsWith('slack:')
-  const client = findClient(authorName)
-  return {
-    isCommitment: isClientMessage
-      && /\b(let'?s|go ahead|order|kick off|please proceed)\b/i.test(message.text)
-      && quantity !== null,
-    clientName: client?.name ?? authorName,
-    ask: message.text,
-    icp: /fintech/i.test(message.text) ? 'fintech CFOs in London' : message.text,
-    quantity,
-    quote: message.text,
-  }
-}
-
-async function extractIntent(message: ChannelMessage): Promise<{ intent: BillableIntent; model: string }> {
-  const apiKey = process.env.FIREWORKS_API_KEY
-  if (!apiKey) return { intent: heuristicIntent(message), model: 'local-fallback' }
-  const fireworks = createFireworks({ apiKey })
+async function extractIntent(
+  message: ChannelMessage,
+): Promise<{ intent: BillableIntent; model: string } | null> {
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) return null
+  const openai = createOpenAI({ apiKey })
+  const model = process.env.OPENAI_MODEL?.trim() || 'gpt-5-mini'
   const prompt = [
     'Extract a billable client commitment from this message.',
     'The quote must be an exact substring. Do not invent any details.',
     `Message author: ${message.author}`,
     `Message: ${message.text}`,
   ].join('\n')
-  const models = [
-    'accounts/fireworks/models/deepseek-v4p1-flash',
-    'accounts/fireworks/models/glm-5p3-flash',
-  ]
-  for (const modelId of models) {
-    try {
-      const result = await generateObject({ model: fireworks(modelId), schema: intentSchema, prompt })
-      return { intent: result.object, model: modelId }
-    } catch (error) {
-      console.warn(`Fireworks extraction failed for ${modelId}: ${String(error)}`)
-    }
-  }
-  return { intent: heuristicIntent(message), model: 'local-fallback-after-model-error' }
+  const { output } = await generateText({
+    model: openai(model),
+    output: Output.object({ schema: intentSchema }),
+    prompt,
+  })
+  return { intent: output, model }
 }
 
 function findSavedDecision(messageId: string): SavedDecision | null {
@@ -222,6 +200,15 @@ async function processMessage(message: ChannelMessage): Promise<void> {
   try {
     if (/\bwhy\b/i.test(message.text) && await explainLatestInvoice(message)) return
     const extracted = await extractIntent(message)
+    if (!extracted) {
+      const reason = 'OPENAI_API_KEY is not configured; extraction is blocked.'
+      recordStep(message.id, 'extract_blocked', reason, {
+        model: process.env.OPENAI_MODEL?.trim() || 'gpt-5-mini',
+      }, ['P1'])
+      await reply(message, `Extraction blocked: ${reason}`)
+      markMessageProcessed(message.id)
+      return
+    }
     const intent = extracted.intent
     intent.clientName = findClient(intent.clientName)?.name ?? intent.clientName
     const quoteValid = intent.quote.length > 0 && message.text.includes(intent.quote)
