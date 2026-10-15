@@ -84,19 +84,9 @@ export async function simulateInvoicePayment(invoiceId: string): Promise<void> {
   }
 
   const stripe = getStripe()
-  const paymentMethod = await stripe.paymentMethods.retrieve('pm_card_visa')
-  const attachedCustomerId = typeof paymentMethod.customer === 'string'
-    ? paymentMethod.customer
-    : paymentMethod.customer?.id ?? null
-  if (attachedCustomerId && attachedCustomerId !== invoice.client_id) {
-    throw new Error('The test card is attached to another customer.')
-  }
-  if (!attachedCustomerId) {
-    await stripe.paymentMethods.attach('pm_card_visa', { customer: invoice.client_id })
-  }
+  const testCard = await stripe.paymentMethods.attach('pm_card_visa', { customer: invoice.client_id })
   await stripe.invoices.pay(invoice.stripe_invoice_id, {
-    paid_out_of_band: false,
-    payment_method: 'pm_card_visa',
+    payment_method: testCard.id,
   }, { idempotencyKey: `simulate-payment-${invoice.id}` })
 }
 
