@@ -40,6 +40,7 @@ import { offerUpsellToAgentBuyer } from '../buyer/upsell'
 import { handleOfferAcceptance, handleOfferApproval, runOpportunityTick } from '../opportunities/opportunities'
 import { gateFirstInvoice, handleIntake, identifyClient, onboardClient } from '../intake/intake'
 import { converse, wantsPlanChange } from '../concierge/concierge'
+import { money as staffMoney, noteToStaff } from '../staff/staff'
 
 const intentSchema = z.object({
   isCommitment: z.boolean(),
@@ -216,6 +217,7 @@ async function continueBilling(message: ChannelMessage, saved: SavedDecision): P
       totalPence: decision.totalPence,
       idempotencyKey: message.id,
     }, decision.clauses)
+    void noteToStaff(message.id, 'invoice', `Invoiced ${intent.clientName} ${staffMoney(decision.totalPence)} for ${leads.length} leads (invoice ${result.stripeInvoiceId}), sent to ${findClient(intent.clientName)?.billingEmail ?? 'the client'}. No action needed.`, decision.clauses)
     // Metering is audit, not the money path: never hold the invoice reply on hundreds of meter calls.
     void meterQualifiedLeads(message.id)
     syncBooks()
@@ -288,6 +290,7 @@ async function requestApproval(
 ): Promise<void> {
   saveApproval({ id: message.id, message_id: message.id, status: 'pending', reason })
   recordStep(message.id, 'approval', 'Requested account-owner approval.', { amount, reason, clauses }, clauses)
+  void noteToStaff(message.id, 'approval', `Approval needed from the account owner: ${amount} invoice for ${findClient(message.author)?.name ?? message.author}. ${reason}`, clauses)
   await reply(message, `Approval required for ${amount}. ${reason} Approve here or in Tally.`, [], { approvalFor: message.id })
 }
 
@@ -530,6 +533,7 @@ async function pollInvoices(): Promise<void> {
         stripeInvoiceId: invoice.stripe_invoice_id,
         csvRows: savedLeads?.success ? savedLeads.data.length : 0,
       }, ['P2', 'P6'])
+      void noteToStaff(invoice.message_id, 'payment', `Payment received: ${message ? findClient(message.author)?.name ?? message.author : 'client'} paid ${staffMoney(invoice.total_pence)} on invoice ${invoice.stripe_invoice_id}; the lead list was delivered. No action needed.`, ['P2', 'P6'])
       syncBooks()
     } catch (error) {
       if (error instanceof BillingBlockedError) return

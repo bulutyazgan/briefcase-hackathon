@@ -18,6 +18,7 @@ import { remember, type MemoryRole } from '../memory/memory'
 import { findClient } from '../clients/clients'
 import { blockIfPaused } from '../control/control'
 import type { Lead } from '../leads/leads'
+import { noteToStaff } from '../staff/staff'
 
 // P11: credit notes up to £200 are issued automatically; above that the account owner approves.
 export const AUTO_CREDIT_LIMIT_PENCE = 20000
@@ -254,6 +255,7 @@ async function issueCredit(message: ChannelMessage, decision: CreditDecision, de
       totalPence: creditNote.totalPence,
       idempotencyKey: `credit-note-${message.id}`,
     }, ['P11'])
+    void noteToStaff(message.id, 'credit_note', `Credited ${decision.clientName} ${money(creditNote.totalPence)} for ${decision.creditedLeads} disputed leads (credit note ${creditNote.id} on invoice ${decision.stripeInvoiceId}). No action needed.`, ['P11'])
     await deps.reply(message, [
       `Credit note ${creditNote.id} issued for ${money(creditNote.totalPence)} against invoice ${decision.stripeInvoiceId}.`,
       evidence(decision),
@@ -307,6 +309,7 @@ export async function handleDispute(message: ChannelMessage, deps: CreditNoteDep
   } else if (decision.outcome === 'needs_approval') {
     saveApproval({ id: message.id, message_id: message.id, status: 'pending', reason: `Credit note ${decision.reason}` })
     recordStep(message.id, 'approval', 'Requested account-owner approval for the credit note.', { totalPence: decision.totalPence }, ['P11'])
+    void noteToStaff(message.id, 'approval', `Approval needed from the account owner: ${money(decision.totalPence)} credit note for ${decision.clientName}. ${decision.reason}`, ['P11'])
     await deps.reply(message, `A credit note of ${money(decision.totalPence)} needs approval. ${decision.reason}\n${evidence(decision)}`)
   } else {
     await issueCredit(message, decision, deps)

@@ -1,5 +1,6 @@
 import { getSetting, markMessageProcessed, recordEvent, setSetting, type ChannelMessage } from '../ledger/store'
 import { reply } from '../channels/channel'
+import { noteToStaff } from '../staff/staff'
 
 // Policy clause F1 (server/policy/billing-policy.md, "Guardrails"): kill switch.
 export const KILL_SWITCH_CLAUSE = 'F1'
@@ -84,6 +85,7 @@ export async function handleControlCommand(message: ChannelMessage): Promise<boo
   const command = message.text.trim().toLowerCase()
   if (command === '/pause') {
     setSetting(PAUSED_KEY, 'true')
+    void noteToStaff(message.id, 'kill_switch', `Paused: ${message.author} engaged the kill switch, so no invoice, credit note or sourcing spend runs until the account owner sends /resume.`, [KILL_SWITCH_CLAUSE])
     return finish(message, 'kill_switch', `Kill switch engaged by ${message.author}. Billing and sourcing stopped.`,
       'Tally is paused (F1 kill switch). No billing or sourcing until the account owner sends /resume.')
   }
@@ -93,6 +95,7 @@ export async function handleControlCommand(message: ChannelMessage): Promise<boo
         'Only the account owner can resume Tally. It stays paused.')
     }
     setSetting(PAUSED_KEY, 'false')
+    void noteToStaff(message.id, 'kill_switch', `Resumed: account owner ${message.author} lifted the kill switch; billing and sourcing are active again.`, [KILL_SWITCH_CLAUSE])
     return finish(message, 'kill_switch', `Account owner ${message.author} resumed Tally.`,
       'Tally resumed by the account owner. Billing and sourcing are active again.')
   }
