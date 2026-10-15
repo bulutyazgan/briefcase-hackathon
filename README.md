@@ -67,6 +67,7 @@ Two paths pay an open invoice in test mode.
 | `P9` | Every Treg call carries `X-Treg-Route-Max-Cost`, and each order has a sourcing cap of 60% of the invoice net. | `leads/providers/treg/` |
 | `P10` | Treg calls only to an allowlist of catalogue endpoints. | `leads/providers/treg/treg-catalog.ts` |
 | `P11` | A dispute earns a credit note for the invalid leads, capped at the number delivered, at the net price per lead. Auto-issue up to £200, above that the account owner approves. | `credit-notes/credit-notes.ts` |
+| `O1`–`O4` | Opportunities: Tally spots revenue (quarterly cadence from memory, a need voiced in the channel, buying signals from the lead gateway) and posts an offer only to known clients for catalogue services, automatically up to £1,000 net, one open offer per client with a 7-day cooldown and never during a dispute; it bills only after an explicit acceptance in the same thread, through the normal commitment path. | `opportunities/opportunities.ts` |
 | `B1` | Buyer: gross spend this calendar month stays at or below £1,500. Over-budget offers and invoices are rejected. | `buyer/policy.ts`, `buyer/buyer.ts` |
 | `B2` | Buyer: the net price per lead on every invoice line is at most £5.00. | `buyer/policy.ts` |
 | `B3` | Buyer: every order carries a PO number, and an invoice is paid only when its `po_number` metadata matches. | `buyer/policy.ts`, `buyer/buyer.ts` |
@@ -89,7 +90,7 @@ Two paths pay an open invoice in test mode.
 | Points | Criterion | What Tally does |
 | --- | --- | --- |
 | 35 | Works end to end | Creates and finalizes a real Stripe test invoice from a chat message, then delivers the leads when Stripe reports `paid`. |
-| 25 | Autonomy with control | Code enforces `P1` to `P11`, `F1`, and `F2` on the seller side and `B1` to `B3` on the buyer side. Approval cards, a kill switch, a restricted key, and sourcing spend caps. |
+| 25 | Autonomy with control | Code enforces `P1` to `P11`, `O1` to `O4`, `F1`, and `F2` on the seller side and `B1` to `B3` on the buyer side. Approval cards, a kill switch, a restricted key, and sourcing spend caps. |
 | 20 | Explains every pound | Quote, memory fact, and clause per line, a PDF evidence appendix, an audit timeline, journals, and "why" answers in the thread. |
 | 20 | Product and creativity | Catches revenue leakage at the moment the client commits, buys the work at a cost, bills it at a margin, and negotiates with the client's own buying agent. |
 
