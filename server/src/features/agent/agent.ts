@@ -116,9 +116,9 @@ function heuristicIntent(message: ChannelMessage): BillableIntent {
   const quantityMatch = message.text.match(/\b(\d{1,5})\s+(?:fintech\s+)?(?:CFO\s+)?leads?\b/i)
   const quantity = quantityMatch?.[1] ? Number(quantityMatch[1]) : null
   const client = findClient(message.author)
-  const isClientMessage = /^Client\b/i.test(message.author) || client !== null || message.channel.startsWith('slack:')
+  // Any sender can commit; whether they are a known client is P5's call in decide(), not extraction's.
   return {
-    isCommitment: isClientMessage
+    isCommitment: message.author !== 'tally'
       && /\b(let'?s|go ahead|order|kick off|please proceed)\b/i.test(message.text)
       && quantity !== null,
     clientName: client?.name ?? (message.channel.startsWith('slack:') ? 'Northwind Capital' : message.author),
