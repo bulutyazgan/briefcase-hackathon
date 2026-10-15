@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import * as stylex from '@stylexjs/stylex'
 import { Button } from '../../components/ui/button'
 import { Closing, Page, Opening, Section } from '../../components/ui/page'
@@ -25,7 +26,28 @@ const clauses = [
   ['P7', 'Limit reminders and respect disputes.'],
 ] as const
 
+// The demo film plays in a dialog under the title: the fastest way to see what the agent does.
+function DemoDialog({ onClose }: { onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+  return (
+    <div {...stylex.props(styles.demoBackdrop)} onClick={onClose} role="presentation">
+      <div {...stylex.props(styles.demoDialog)} role="dialog" aria-modal="true" aria-label="How Tally works" onClick={(event) => event.stopPropagation()}>
+        <div {...stylex.props(styles.demoHeader)}>
+          <Text role="heading16">From a client message to a paid invoice, in 78 seconds</Text>
+          <Button variant="secondary" onClick={onClose}>Close</Button>
+        </div>
+        <video {...stylex.props(styles.demoVideo)} src="/demo/tally-demo.mp4" poster="/demo/tally-demo-poster.png" controls autoPlay playsInline />
+      </div>
+    </div>
+  )
+}
+
 export function Landing() {
+  const [demoOpen, setDemoOpen] = useState(false)
   return (
     <div {...stylex.props(styles.root)}>
       <nav aria-label="Site navigation" {...stylex.props(styles.nav)}>
@@ -35,7 +57,7 @@ export function Landing() {
       <div {...stylex.props(styles.content)}>
         <Page>
           <div {...stylex.props(styles.hero)}>
-            <Opening title="PostHog for finance and customer service." lede="Remove the paperwork between yes and paid. One agent in the client chat onboards, sells, invoices and follows up, and every pound is explained." tools={<Button variant="primary" onClick={() => navigate('/app/inbox')}>Explore Tally</Button>} />
+            <Opening title="PostHog for finance and customer service." lede="Remove the paperwork between yes and paid. One agent in the client chat onboards, sells, invoices and follows up, and every pound is explained." tools={<><Button variant="primary" onClick={() => setDemoOpen(true)}>See how it works</Button><Button variant="secondary" onClick={() => navigate('/app/inbox')}>Explore Tally</Button></>} />
             <div {...stylex.props(styles.heroCard)}>
               <Text role="label">A client commitment</Text>
               <div {...stylex.props(styles.message)}>“Let’s kick off Q4. 300 fintech CFO leads in London, same deal as last time.”</div>
@@ -65,6 +87,7 @@ export function Landing() {
           <Closing>Every invoice keeps the client’s words, the remembered agreement and the policy decision together.</Closing>
         </Page>
       </div>
+      {demoOpen && <DemoDialog onClose={() => setDemoOpen(false)} />}
     </div>
   )
 }

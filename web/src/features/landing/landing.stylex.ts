@@ -1,7 +1,11 @@
 import * as stylex from '@stylexjs/stylex'
-import { color, radius, space, text, weight } from '../../tokens/tokens.stylex'
+import { color, radius, shadow, space, text, weight } from '../../tokens/tokens.stylex'
 
 export const styles = stylex.create({
+  demoBackdrop: { alignItems: 'center', backgroundColor: 'rgba(23, 23, 23, 0.72)', display: 'flex', inset: 0, justifyContent: 'center', padding: space.lg, position: 'fixed', zIndex: 50 },
+  demoDialog: { backgroundColor: color.canvas, borderRadius: radius.tile, boxShadow: shadow.float, display: 'flex', flexDirection: 'column', gap: space.sm, maxWidth: '1120px', padding: space.md, width: '100%' },
+  demoHeader: { alignItems: 'center', display: 'flex', justifyContent: 'space-between' },
+  demoVideo: { aspectRatio: '16 / 10', backgroundColor: color.well, borderRadius: radius.control, display: 'block', width: '100%' },
   root: { backgroundColor: color.canvas, minHeight: '100dvh', paddingBlock: space.md, paddingInline: space.lg, '@media (max-width: 700px)': { paddingInline: space.xs } },
   nav: { alignItems: 'center', display: 'flex', justifyContent: 'space-between', marginInline: 'auto', maxWidth: '1200px', paddingBlock: space.md, paddingInline: space.xs },
   brand: { alignItems: 'center', color: color.ink, display: 'inline-flex', fontFamily: text.fontSans, fontSize: text.compact, fontWeight: weight.medium, gap: space.sm, textDecoration: 'none' },
