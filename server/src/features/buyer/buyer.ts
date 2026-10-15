@@ -1,3 +1,4 @@
+import { BillingBlockedError } from '../billing/billing'
 import { z } from 'zod'
 import {
   getEvent,
@@ -134,7 +135,11 @@ export function startBuyerLoop(payments: () => BuyerPayments): void {
     running = true
     void Promise.resolve()
       .then(() => runBuyerTick(payments()))
-      .catch((error) => console.warn(`Buyer agent tick failed: ${String(error)}`))
+      .catch((error) => {
+        // No Stripe key yet: the buyer has nothing to pay, so stay quiet instead of warning every tick.
+        if (error instanceof BillingBlockedError) return
+        console.warn(`Buyer agent tick failed: ${String(error)}`)
+      })
       .finally(() => { running = false })
   }, 3000)
 }
