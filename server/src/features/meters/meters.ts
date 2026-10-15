@@ -171,7 +171,8 @@ export async function meterQualifiedLeads(messageId: string, api?: MeterApi): Pr
     for (const row of pending) {
       const event = await stripe.billing.meterEvents.create({
         event_name: METER_EVENT_NAME,
-        identifier: row.leadId,
+        // Scoped to the order: Stripe dedupes identifiers for 24 h, and the same lead can be bought in two orders.
+        identifier: `${messageId}:${row.leadId}`,
         payload: { stripe_customer_id: stripeCustomerId, value: '1' },
       }, { idempotencyKey: `meter-event-${messageId}-${row.leadId}` })
       const meterRow: MeterEventRow = {

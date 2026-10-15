@@ -200,7 +200,8 @@ async function continueBilling(message: ChannelMessage, saved: SavedDecision): P
       totalPence: decision.totalPence,
       idempotencyKey: message.id,
     }, decision.clauses)
-    await meterQualifiedLeads(message.id)
+    // Metering is audit, not the money path: never hold the invoice reply on hundreds of meter calls.
+    void meterQualifiedLeads(message.id)
 
     let pdfPath: string | null = null
     try {

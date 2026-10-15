@@ -102,7 +102,7 @@ describe('qualifyLeads', () => {
 })
 
 describe('meterQualifiedLeads', () => {
-  test('sends one meter event per qualified lead with identifier = lead id', async () => {
+  test('sends one meter event per qualified lead with identifier = order:lead id', async () => {
     const messageId = 'msg-meter-1'
     seedInvoice(messageId)
     recordLeadQualification(messageId, [lead('q1'), lead('q2', { url: '' }), lead('q3')])
@@ -111,8 +111,8 @@ describe('meterQualifiedLeads', () => {
     expect(await meterQualifiedLeads(messageId, fake.api)).toBe(2)
     expect(fake.metersCreated).toEqual(['qualified_lead'])
     expect(fake.meterEvents.map((event) => [event.identifier, event.customer, event.value])).toEqual([
-      ['q1', 'cus_northwind', '1'],
-      ['q3', 'cus_northwind', '1'],
+      ['msg-meter-1:q1', 'cus_northwind', '1'],
+      ['msg-meter-1:q3', 'cus_northwind', '1'],
     ])
   })
 
@@ -128,7 +128,7 @@ describe('meterQualifiedLeads', () => {
     expect(await meterQualifiedLeads(messageId, fake.api)).toBe(0)
 
     expect(fake.metersCreated).toEqual([])
-    expect(fake.meterEvents.map((event) => event.identifier)).toEqual(['r1', 'r2'])
+    expect(fake.meterEvents.map((event) => event.identifier)).toEqual(['msg-meter-2:r1', 'msg-meter-2:r2'])
     expect(invoiceLeadRows(messageId)?.length).toBe(2)
   })
 })
@@ -148,7 +148,7 @@ describe('invoiceLeadRows', () => {
         company: 'Company s1',
         qualified: true,
         reason: 'has name, company and url; not a duplicate',
-        meterIdentifier: 's1',
+        meterIdentifier: 'msg-meter-3:s1',
       },
       {
         id: 's1',
