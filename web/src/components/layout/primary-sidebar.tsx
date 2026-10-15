@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Activity01Icon, InboxIcon, Invoice01Icon, Notification01Icon, Shield01Icon, UserGroupIcon } from '@hugeicons/core-free-icons'
+import { Activity01Icon, Building03Icon, InboxIcon, Invoice01Icon, Notification01Icon, Shield01Icon, UserGroupIcon } from '@hugeicons/core-free-icons'
 import { space } from '../../tokens/tokens.stylex'
 import { TallyLogo } from '../ui/tally-logo'
 import { Link } from '../../router'
@@ -9,6 +9,7 @@ import { styles } from './app-shell.stylex'
 const items = [
   { label: 'Inbox', path: '/app/inbox', icon: InboxIcon, key: 'inbox' },
   { label: 'Notifications', path: '/app/notifications', icon: Notification01Icon, key: 'notifications' },
+  { label: 'Company', path: '/app/company', icon: Building03Icon, key: 'company' },
   { label: 'Invoices', path: '/app/invoices', icon: Invoice01Icon, key: 'invoices' },
   { label: 'Leads', path: '/app/leads', icon: UserGroupIcon, key: 'leads' },
   { label: 'Audit', path: '/app/audit', icon: Activity01Icon, key: 'audit' },

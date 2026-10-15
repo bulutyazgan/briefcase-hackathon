@@ -16,6 +16,7 @@ import { InvoiceDetail, Invoices } from './features/invoices/view'
 import { Policy } from './features/policy/view'
 import { Leads } from './features/leads/view'
 import { Notifications, notificationsOf } from './features/notifications/view'
+import { Company } from './features/company/view'
 import { navigate, usePath } from './router'
 
 type Route =
@@ -26,6 +27,7 @@ type Route =
   | { page: 'audit' }
   | { page: 'policy' }
   | { page: 'notifications' }
+  | { page: 'company' }
   | { page: 'not-found' }
 
 function resolveRoute(path: string): Route {
@@ -35,6 +37,7 @@ function resolveRoute(path: string): Route {
   if (path === '/app/audit') return { page: 'audit' }
   if (path === '/app/policy') return { page: 'policy' }
   if (path === '/app/notifications') return { page: 'notifications' }
+  if (path === '/app/company') return { page: 'company' }
   const match = path.match(/^\/app\/invoices\/([^/]+)$/)
   if (match) {
     try {
@@ -97,6 +100,7 @@ function RouteContent({ route, state, leads, onRefresh }: { route: Route; state:
   if (route.page === 'invoice-detail') return <InvoiceDetail state={state} invoiceId={route.invoiceId} onRefresh={onRefresh} />
   if (route.page === 'audit') return <Audit state={state} />
   if (route.page === 'notifications') return <Notifications state={state} />
+  if (route.page === 'company') return <Company />
   return <Policy state={state} />
 }
 

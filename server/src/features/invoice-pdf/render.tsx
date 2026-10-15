@@ -17,12 +17,12 @@ registerFont('Amiamie', 'Amiamie-Black.ttf', 900)
 registerFont('GeistMono', 'GeistMono-Regular.ttf', 400)
 registerFont('GeistMono', 'GeistMono-Medium.ttf', 500)
 
-const INK = '#17221d'
-const MUTED = '#69756f'
-const ACCENT = '#147a57'
-const ACCENT_SOFT = '#e8f4ee'
-const BORDER = '#dfe5e1'
-const SURFACE = '#f4f6f5'
+const INK = '#111111'
+const MUTED = '#6b6b6b'
+const ACCENT = '#111111'
+const ACCENT_SOFT = '#f2f2f2'
+const BORDER = '#e5e5e5'
+const SURFACE = '#f7f7f7'
 
 const CLAUSE_TEXT: Record<string, string> = {
   P1: 'Bill only from a client message with an explicit commitment.',
@@ -62,9 +62,9 @@ const styles = StyleSheet.create({
   totalsBox: { width: 230 },
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', paddingTop: 5, paddingBottom: 5 },
   totalValue: { width: 90, textAlign: 'right', fontFamily: 'GeistMono', fontSize: 9 },
-  grandRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: 10, paddingBottom: 10, paddingLeft: 12, paddingRight: 12, borderRadius: 8, backgroundColor: INK },
-  grandLabel: { color: '#ffffff', fontSize: 10 },
-  grandValue: { color: '#ffffff', fontFamily: 'GeistMono', fontSize: 12, fontWeight: 500 },
+  grandRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: 10, paddingBottom: 10, paddingLeft: 12, paddingRight: 12, borderRadius: 8, backgroundColor: SURFACE, borderWidth: 1, borderColor: BORDER },
+  grandLabel: { color: INK, fontSize: 10 },
+  grandValue: { color: INK, fontFamily: 'GeistMono', fontSize: 12, fontWeight: 500 },
   pay: { flexDirection: 'row', gap: 18, marginTop: 34, padding: 18, borderRadius: 12, backgroundColor: SURFACE, alignItems: 'center' },
   payText: { flex: 1 },
   payTitle: { fontSize: 13, marginBottom: 4 },
@@ -136,7 +136,7 @@ function InvoicePage({ invoice }: { invoice: PdfInvoice }) {
             <View style={styles.brandDot} />
             <Text style={styles.brandName}>tally</Text>
           </View>
-          <Text style={styles.brandMeta}>Tally Leads Ltd · London · billing@tally.dev</Text>
+          <Text style={styles.brandMeta}>Brightline Studio · London · billed by Tally</Text>
         </View>
         <View>
           <Text style={styles.title}>Invoice</Text>
@@ -178,7 +178,7 @@ function InvoicePage({ invoice }: { invoice: PdfInvoice }) {
             <View style={styles.row}>
               <View style={styles.cellDescription}>
                 <Text style={styles.lineTitle}>{line.description}</Text>
-                <Text style={styles.lineNote}>Verified contacts, delivered as CSV once paid</Text>
+                <Text style={styles.lineNote}>{/lead/i.test(line.description) ? 'Verified contacts, delivered as CSV once paid' : 'Agreed with the client in chat'}</Text>
               </View>
               <Text style={styles.cellNumber}>{line.quantity}</Text>
               <Text style={styles.cellNumber}>{pounds(line.unitPricePence)}</Text>
@@ -228,7 +228,7 @@ function InvoicePage({ invoice }: { invoice: PdfInvoice }) {
         <View style={styles.payText}>
           <Text style={styles.payTitle}>Pay by card or bank transfer</Text>
           <Text style={styles.payBody}>
-            Scan the code or open the secure Stripe payment page. The lead list is delivered as soon as the payment clears.
+            Scan the code or open the secure Stripe payment page. Payment is confirmed automatically.
           </Text>
           {invoice.stripeInvoiceId && (
             <Text style={{ ...styles.payBody, fontFamily: 'GeistMono', marginTop: 6 }}>{invoice.stripeInvoiceId}</Text>
