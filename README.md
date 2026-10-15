@@ -164,6 +164,10 @@ Eight scripts in `server/scripts/` call the real services once the matching key 
 
 What is proven against the real service so far: Treg sourcing. `bun scripts/verify-treg.ts` with the team token bought 3 leads for 2,000 micro-USD through `apollo.people.search`. Stripe billing is proven against the mock harness only, not against the Stripe test API.
 
+## Demo
+
+`DEMO.md` is the two-minute script, "Said, done, billed", in six beats: a new client onboarded from the company knowledge base, a proactive offer paid by the client's own procurement agent, a plan change that becomes a Stripe subscription, a late payer who disputes and gets a credit note, then "Why £1,080?", the books and `/pause`. `bun run demo:seed` resets the ledger into the demo state (Northwind's open need, Globex's 50-lead invoice open for 10 days) and writes the client facts and company knowledge to Cognee when keys exist. `e2e/film-demo.ts` records the same six beats headless against the mock stack (`E2E_SEED=demo bun e2e/stack.ts`, then `bun e2e/film-demo.ts <out-dir>`) and writes a video, a keyframe per beat and `beats.json`; a beat that fails is logged and the next one runs.
+
 ## Stack and sponsors
 
 - **Stripe** test mode for customers, tax rates, invoice items, invoices, credit notes, meter events, test-card payments, and the hosted invoice page.

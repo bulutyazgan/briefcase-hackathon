@@ -64,23 +64,23 @@
   },
   {
     "clientName": "Globex Partners",
-    "fact": "Pays on 14-day terms",
+    "fact": "Pays on 7-day terms",
     "date": "2026-09-02",
     "role": "billing",
     "sourceMessageId": "seed:globex-2026-09-02-terms"
   },
   {
-    "clientName": "Globex Partners",
-    "fact": "Disputed the September invoice: says 60 of the leads were invalid",
-    "date": "2026-09-20",
-    "role": "collections",
-    "sourceMessageId": "seed:globex-2026-09-20-dispute"
-  },
-  {
     "clientName": "Louis",
-    "fact": "Signed the website care plan at £500 per month, billed monthly",
+    "fact": "Signed the website care plan at \u00a3500 per month, billed monthly",
     "date": "2026-06-01",
     "role": "billing",
     "sourceMessageId": "seed:louis-2026-06-01-care-plan"
+  },
+  {
+    "clientName": "Globex Partners",
+    "fact": "September list of 50 leads delivered in full; no dispute raised",
+    "date": "2026-10-05",
+    "role": "collections",
+    "sourceMessageId": "seed:globex-2026-10-05-delivered"
   }
 ]

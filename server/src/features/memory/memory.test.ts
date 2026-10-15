@@ -15,8 +15,10 @@ describe('seeded memory', () => {
     }
     const northwind = await recall('Northwind', 'discount', undefined, { cognee: null })
     expect(northwind.some((entry) => entry.fact === 'Agreed 10% off orders over 200 leads' && entry.date === '2026-08-12')).toBe(true)
+    // The demo seeds Globex dispute-free so the late-payer beat sends a reminder (P7).
     const globex = await recall('Globex Partners', 'dispute', 'collections', { cognee: null })
-    expect(globex.map((entry) => entry.date)).toEqual(['2026-09-20'])
+    expect(globex.map((entry) => entry.date)).toEqual(['2026-10-05'])
+    expect(globex.some((entry) => /Disputed/.test(entry.fact))).toBe(false)
   })
 
   test('legacy recallFacts wrapper still returns MemoryFact-compatible entries', async () => {
