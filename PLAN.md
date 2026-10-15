@@ -152,3 +152,37 @@ Researched at 18:30. Each layer maps to a track idea the organisers listed or to
 **Two-minute video (target):** 0:00 the problem (work agreed in chat, never invoiced) → 0:15 client message in Slack → 0:30 Tally recalls the 10% deal from Cognee, sizes 300 real leads, needs approval (P4) → 0:50 approve → real Stripe invoice + PDF in channel → 1:05 buyer agent negotiates and pays (A) → 1:20 leads delivered, journal posted (E) → 1:35 client disputes 60 leads → credit note (D) → 1:50 "Why did you bill £1,080?" → cited answer. Close on the audit timeline.
 
 **For the future host (Louis):** the reusable parts are the channel adapter interface, the policy-as-code + clause ids, the ledger event log, and the "LLM extracts, code decides" split. A starter repo with those four, plus seeded Stripe test data, would let teams spend the evening on the idea, not the plumbing.
+
+## 13. Decisions from the grilling session (19:30)
+
+These override earlier sections where they conflict.
+
+**Product**
+- "Tally" is only the working name for the billing agent; it clashes with tally.so (forms). Rename before recording. **Name still open.**
+- The lead-gen agency runs the agent. The agent buys leads from **Treg** (hosted `treg.to`, one `X-Treg-Token`, per-call cost in `X-Treg-Cost-Micro`) and resells them to the client at a margin.
+- **Treg and provider names are never shown to the client** (invoice, PDF, channel replies). They live only in the internal audit log.
+
+**Pricing and policy**
+- Price comes from a **per-client price list** (e.g. Northwind £4/lead, Acme £5/lead). The client is billed `bought_count × their price` — only what was actually bought and delivered.
+- Discounts: the LLM extracts `{percent, threshold, date}` from Cognee recall; code validates it against P3.
+- New clauses:
+  - `P8` Margin ≥ 40% over Treg sourcing cost, otherwise the invoice needs approval.
+  - `P9` Spend caps: every Treg call carries `X-Treg-Route-Max-Cost`; the order has a total sourcing cap. Code enforces both.
+  - `P10` Provider calls only from an allowlist of Treg catalogue endpoints (people, company, signals).
+- Order of operations: extract → recall → decide (P1, P3, P5) → approval if needed (P4, P8) → **buy** leads via Treg → invoice exactly what was bought → collect → deliver.
+- Provider choice: the LLM proposes Treg catalogue calls from the ICP and buying signals; code accepts or rejects each one (P9, P10) and logs the reason.
+- Signals: extraction adds a `signals` field from the message; memory adds the client's saved ICP; the message wins on conflict.
+- Approvals are clicked in the dashboard.
+
+**Demo data**
+- Seeded mock clients: **Northwind Capital** (10% off > 200 leads, 7-day terms → £1,080, needs approval), **Acme Ventures** (no discount, 100 leads → auto-sends), **Globex Partners** (remembered dispute → P7 no reminders, credit-note story). Unknown senders refused (P5).
+- Video is recorded on the in-app simulator; Slack only if it works by 20:00.
+- Buyer agent (layer A): £1,500/month, ≤ £5/lead, PO number required; it accepts Northwind's invoice and pays with `pm_card_visa`, and rejects one over-budget counter-offer on camera.
+
+**Build**
+- All layers A–F are in scope, built in parallel by Claude agents, in dependency waves. G is setup for the builder agents, not a layer.
+  - Wave 1 (no dependencies): Treg sourcing (P9, P10, signals) · pricing (client list, price list, discount extraction, P8) · F restricted key + `/pause` · C shared memory.
+  - Wave 2 (needs wave 1): B meters per bought lead · D credit notes · E journals with Treg cost of sale + 20% VAT · A buyer agent.
+- Each layer lives in its own `server/src/features/<layer>/` module with one small hook into `agent.ts`.
+- Verification in two stages. **Built** = `bun run typecheck` + `bun test` (pure logic, plus a recording fake of our billing module). **Verified** = a `verify-<layer>.ts` script creates the real Stripe test object and prints its id, run once the `STRIPE_SECRET_KEY` (sk_test) and `TREG_TOKEN` secrets are added to the environment.
+- Louis pushes his work first. Layers merge into the `ambitious` branch in dependency order; Louis merges `ambitious` into `main` once the core demo bills. Anything not green by 20:05 is dropped, not patched.
