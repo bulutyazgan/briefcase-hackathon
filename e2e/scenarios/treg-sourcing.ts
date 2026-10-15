@@ -1,18 +1,20 @@
-import { assert, sendFromSimulator, type Scenario } from '../support/harness'
+import { approvalCard, assert, openInbox, openInvoicePage, sendFromSimulator, waitForStripeInvoice, type Scenario } from '../support/harness'
 import { NORTHWIND_ASK } from './northwind-main-story'
 
 export const tregSourcing: Scenario = {
   id: 'treg-sourcing',
   title: 'P9/P10: approved Northwind order buys leads through Treg within the spend cap',
   async run(context) {
-    const { page } = context
-    await page.goto(context.web)
-    await page.getByRole('heading', { name: 'Client channel' }).waitFor()
+    const { page, api } = context
+    await openInbox(page, context.web)
     await sendFromSimulator(page, NORTHWIND_ASK)
-    const approvalCard = page.getByRole('region', { name: 'Invoice approval' })
-    await approvalCard.waitFor({ timeout: 30000 })
-    await approvalCard.getByRole('button', { name: 'Approve invoice' }).click()
-    await page.getByRole('region', { name: 'Invoices' }).getByRole('button', { name: /in_mock_/ }).first().waitFor({ timeout: 45000 })
+    const card = approvalCard(page)
+    await card.waitFor({ timeout: 30000 })
+    await card.getByRole('button', { name: 'Approve invoice' }).click()
+    const invoice = await waitForStripeInvoice(api, 60000)
+    await page.getByText(/300 leads are ready/).first().waitFor({ timeout: 30000 })
+    await openInvoicePage(page, context.web, invoice.id)
+    await page.getByRole('heading', { level: 1, name: /£1,080\.00/ }).waitFor()
     await context.shot('sourced-and-invoiced')
     const log = await context.mockLog()
     const calls = log.filter((entry) => entry.provider === 'treg')

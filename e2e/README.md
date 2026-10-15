@@ -25,7 +25,14 @@ Evidence lands in `e2e/artifacts/` (git-ignored): `<scenario>/<nn>-<step>.png`,
 `<scenario>.server.log`, `mock-log.json` on failure, and `results.json`.
 
 Scenarios live in `e2e/scenarios/`; `e2e/pending.ts` lists scenarios and
-sub-checks that wait on unmerged product work, with the reason.
+sub-checks that wait on unmerged product work, with the reason. The UI is routed:
+scenarios open `/app/inbox` (composer, approval cards), `/app/invoices/<id>`
+(evidence trail, Stripe link) and `/app/audit`; `support/harness.ts` holds the
+navigation helpers and the selectors (`approvalCard`, `stripeInvoiceLink`).
+Scenarios: `northwind-main-story`, `unknown-sender-refused`, `replay-safety`,
+`pause-blocks-billing`, `acme-auto-send`, `treg-sourcing`, `globex-dispute`
+(credit note, P11), `buyer-agent` (pending: the Stripe mock lacks
+`POST /v1/invoices/:id/send`).
 
 ## What the mocks replicate (`e2e/mock-providers/`)
 

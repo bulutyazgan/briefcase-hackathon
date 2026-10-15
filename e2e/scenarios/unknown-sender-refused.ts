@@ -1,12 +1,11 @@
-import { assert, ledger, postSimulatorMessage, stripeCalls, waitFor, type Scenario } from '../support/harness'
+import { assert, ledger, openInbox, openInvoiceList, postSimulatorMessage, stripeCalls, waitFor, type Scenario } from '../support/harness'
 
 export const unknownSenderRefused: Scenario = {
   id: 'unknown-sender-refused',
   title: 'P5: an unknown sender is refused and nothing reaches Stripe',
   async run(context) {
     const { page, api } = context
-    await page.goto(context.web)
-    await page.getByRole('heading', { name: 'Client channel' }).waitFor()
+    await openInbox(page, context.web)
     const text = "Let's kick off. 300 fintech CFO leads in London please."
     const messageId = await postSimulatorMessage(api, 'Client — Initech Unknown', text)
     await page.getByText(text).first().waitFor()
@@ -25,7 +24,9 @@ export const unknownSenderRefused: Scenario = {
     assert(state.approvals.length === 0, 'no approval may be requested for an unknown sender')
     const decide = state.events.find((event) => event.message_id === messageId && event.step === 'decide')
     assert(decide !== undefined, 'a decide event must be recorded')
-    assert(await page.getByText('No invoices yet.', { exact: false }).isVisible(), 'invoices view must stay empty')
+    await openInvoiceList(page, context.web)
+    await page.getByText('No invoices have been created yet.').waitFor()
+    await context.shot('invoices-empty')
     const log = await context.mockLog()
     assert(stripeCalls(log, 'POST', /^\/v1\//).length === 0, 'Stripe must receive no writes')
   },
