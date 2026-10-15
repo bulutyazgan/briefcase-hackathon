@@ -31,10 +31,14 @@ recordEvent({
 })
 const outputPath = await renderInvoicePdf({
   invoiceId: sampleId,
-  clientName: 'Sample client',
+  issuedAt: new Date(),
+  dueInDays: 7,
+  client: { name: 'Northwind Capital', email: 'billing@northwind.example' },
+  paymentUrl: 'https://invoice.stripe.com/i/acct_test/test_sample',
+  stripeInvoiceId: 'in_1QxSampleTestMode',
   totalPence: 108000,
   lines: [{
-    description: 'Sample lead list (3 sourced)',
+    description: 'Q4 lead list · fintech CFOs, London',
     quantity: 300,
     unitPricePence: 400,
     totalPence: 108000,

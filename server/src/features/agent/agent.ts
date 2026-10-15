@@ -145,11 +145,16 @@ async function continueBilling(message: ChannelMessage, saved: SavedDecision): P
 
     let pdfPath: string | null = null
     try {
+      const client = findClient(intent.clientName)
       pdfPath = await renderInvoicePdf({
         invoiceId: message.id,
-        clientName: intent.clientName,
+        issuedAt: new Date(),
+        dueInDays: 7,
+        client: { name: client?.name ?? intent.clientName, email: client?.email ?? '' },
         totalPence: decision.totalPence,
         lines: decision.lines,
+        paymentUrl: result.hostedUrl ?? undefined,
+        stripeInvoiceId: result.stripeInvoiceId ?? undefined,
       })
       updateInvoice(message.id, 'open', undefined, pdfPath)
       recordStep(message.id, 'render', 'Rendered the invoice and evidence appendix.', { pdfPath }, decision.clauses)
