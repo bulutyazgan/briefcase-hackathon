@@ -31,6 +31,7 @@ import { renderInvoicePdf } from '../invoice-pdf/render'
 import { blockIfPaused, handleControlCommand } from '../control/control'
 import { runCollectionsTick } from '../collections/collections'
 import { meterQualifiedLeads, recordLeadQualification } from '../meters/meters'
+import { handleCreditNoteApproval, handleDispute } from '../credit-notes/credit-notes'
 
 const intentSchema = z.object({
   isCommitment: z.boolean(),
@@ -323,6 +324,7 @@ async function processMessage(message: ChannelMessage): Promise<void> {
   if (await handleControlCommand(message)) return
   try {
     if (/\bwhy\b/i.test(message.text) && await explainLatestInvoice(message)) return
+    if (await handleDispute(message)) return
     const extracted = await extractIntent(message)
     const intent = extracted.intent
     // P5: the sender identifies the client; the extracted name is only a fallback.
@@ -415,6 +417,7 @@ async function processApprovedMessage(messageId: string): Promise<void> {
 }
 
 export async function handleApproval(messageId: string, action: 'approve' | 'reject'): Promise<void> {
+  if (await handleCreditNoteApproval(messageId, action)) return
   const message = getMessage(messageId)
   if (!message) return
   updateApproval(messageId, action === 'approve' ? 'approved' : 'rejected')
