@@ -123,6 +123,38 @@ export async function remember(
   return entry
 }
 
+export async function storeInCogneeDataset(dataset: string, text: string): Promise<boolean> {
+  const cognee = resolveCognee({})
+  if (!cognee) return false
+  await cognee.add(dataset, text)
+  await cognee.cognify(dataset)
+  return true
+}
+
+export async function searchCogneeDataset(
+  dataset: string,
+  query: string,
+  options: { topK?: number; timeoutMs?: number } = {},
+): Promise<string[] | null> {
+  const cognee = resolveCognee({})
+  if (!cognee) return null
+  return cognee.search(dataset, query, {
+    topK: options.topK ?? 20,
+    signal: AbortSignal.timeout(options.timeoutMs ?? 4000),
+  })
+}
+
+export async function seedClientMemoryToCognee(clientName: string): Promise<boolean> {
+  const cognee = resolveCognee({})
+  if (!cognee) return false
+  const facts = (await seededFacts()).filter((entry) => sameClient(entry.clientName, clientName))
+  if (!facts.length) return false
+  const dataset = datasetName(clientName)
+  await Promise.all(facts.map((fact) => cognee.add(dataset, encodeFact(fact))))
+  await cognee.cognify(dataset)
+  return true
+}
+
 export async function recall(
   clientName: string,
   query: string,

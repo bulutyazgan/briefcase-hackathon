@@ -12,6 +12,7 @@ const clauses = [
   { id: 'P5', rule: 'Known clients only (Stripe customer exists or is in the client list). Unknown → ask, do not bill.', value: 'Known clients only', enforcedBy: 'findClient()' },
   { id: 'P6', rule: 'One invoice per commitment message (idempotency).', value: 'One invoice per message', enforcedBy: 'createInvoice()' },
   { id: 'P7', rule: 'Reminders at most once per 24 h, and never after a remembered dispute.', value: 'Once per 24 hours', enforcedBy: 'pollInvoices()' },
+  { id: 'P8', rule: 'Plan changes in chat: known client, current plan matches the record, new plan differs, price from the company rate card. Staff get a note.', value: 'Company rate card', enforcedBy: 'converse()' },
 ]
 
 export function Policy({ state }: { state?: AppState }) {
@@ -24,9 +25,9 @@ export function Policy({ state }: { state?: AppState }) {
   ]
   return (
     <Page>
-      <Opening title="Billing follows the client’s written agreement" lede="Seven rules keep autonomous collection inside clear limits." />
+      <Opening title="Billing follows the client’s written agreement" lede="Eight rules keep autonomous collection inside clear limits." />
       <StatStrip items={[
-        { label: 'Policy clauses', value: '7', mono: true },
+        { label: 'Policy clauses', value: '8', mono: true },
         { label: 'Approval threshold', value: '£1,000', mono: true },
         { label: 'Maximum discount', value: '15%', mono: true },
       ]} />
