@@ -96,6 +96,13 @@ Lives in `server/policy/billing-policy.md` (human-readable, shown in the UI) and
 - `P10` Treg calls only to an allowlist of catalogue endpoints (people, company, buying signals).
 - `P11` Disputed leads earn a Stripe credit note for the claimed invalid leads (capped at the delivered count) at the invoice's net price per lead. Auto-issue up to £200. Above that, one approval from the account owner.
 
+Opportunities (Tally spots revenue and offers it; `server/src/features/opportunities/`):
+
+- `O1` Offers go only to known clients (the seeded list) and only for catalogue services (lead-list).
+- `O2` An offer worth up to £1,000 net is posted automatically. Above that, one approval from the account owner before it is posted.
+- `O3` At most one open offer per client, a 7-day cooldown after a decline or expiry, and never while a dispute is remembered.
+- `O4` An offer bills only after an explicit acceptance in the same thread that quotes it; the acceptance then runs the normal commitment path (P1 to P10).
+
 ## 6. Stack
 
 | Concern | Choice | Why |

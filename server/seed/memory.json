@@ -22,6 +22,13 @@
   },
   {
     "clientName": "Northwind Capital",
+    "fact": "Orders a fresh list of 200 leads every quarter; last list delivered 2026-07-14",
+    "date": "2026-07-14",
+    "role": "sales",
+    "sourceMessageId": "seed:northwind-2026-07-14-cadence"
+  },
+  {
+    "clientName": "Northwind Capital",
     "fact": "Saved ICP: fintech CFOs in London",
     "date": "2026-08-12",
     "role": "sales",

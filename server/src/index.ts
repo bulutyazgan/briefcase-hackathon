@@ -15,6 +15,7 @@ import { startBuyerLoop } from './features/buyer/buyer'
 import { stripePayments } from './features/buyer/providers/stripe-payments'
 import { getStripe } from './features/billing/billing'
 import { booksRoutes } from './features/books/routes'
+import { listOpportunityViews } from './features/opportunities/opportunities'
 
 const leadsSchema = z.array(z.object({
   name: z.string(),
@@ -50,6 +51,7 @@ app.route('/api/channels', channelRoutes)
 app.route('/api/buyer', buyerRoutes)
 app.get('/api/control', (context) => context.json(controlStatus()))
 app.route('/api/books', booksRoutes)
+app.get('/api/opportunities', (context) => context.json({ opportunities: listOpportunityViews() }))
 
 app.post('/api/approvals/:id', async (context) => {
   const messageId = context.req.param('id')

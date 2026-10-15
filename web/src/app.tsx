@@ -4,6 +4,7 @@ import { getSnapshot, refreshState, subscribe } from './app-state'
 import { Audit } from './features/audit/view'
 import { Inbox, PendingApprovals } from './features/inbox/view'
 import { Invoices } from './features/invoices/view'
+import { Opportunities } from './features/opportunities/view'
 import { Policy } from './features/policy/view'
 import { Link, navigate, usePath } from './router'
 import { styles } from './app.stylex'
@@ -13,6 +14,7 @@ type Route =
   | { page: 'invoices' }
   | { page: 'invoice-detail'; invoiceId: string }
   | { page: 'audit' }
+  | { page: 'opportunities' }
   | { page: 'policy' }
   | { page: 'not-found' }
 
@@ -20,6 +22,7 @@ function resolveRoute(path: string): Route {
   if (path === '/app/inbox') return { page: 'inbox' }
   if (path === '/app/invoices') return { page: 'invoices' }
   if (path === '/app/audit') return { page: 'audit' }
+  if (path === '/app/opportunities') return { page: 'opportunities' }
   if (path === '/app/policy') return { page: 'policy' }
   const invoiceMatch = path.match(/^\/app\/invoices\/([^/]+)$/)
   if (invoiceMatch) {
@@ -67,6 +70,7 @@ function ShellNavigation({
   const items: { label: string; to: string; key: string; count?: number }[] = [
     { label: 'Inbox', to: '/app/inbox', key: 'inbox', count: pendingCount },
     { label: 'Invoices', to: '/app/invoices', key: 'invoices', count: invoiceCount },
+    { label: 'Opportunities', to: '/app/opportunities', key: 'opportunities' },
     { label: 'Audit', to: '/app/audit', key: 'audit' },
     { label: 'Policy', to: '/app/policy', key: 'policy' },
   ]
@@ -185,6 +189,10 @@ export function App() {
         <Link to="/app/policy" {...stylex.props(styles.secondaryPill)}>View policy</Link>
       </>
     )
+  } else if (route.page === 'opportunities') {
+    title = 'Opportunities'
+    subtitle = 'Revenue Tally spotted, offered within policy, and billed on acceptance.'
+    actions = <Link to="/app/policy" {...stylex.props(styles.secondaryPill)}>View policy</Link>
   } else if (route.page === 'policy') {
     title = 'Billing policy'
     subtitle = 'The rules Tally applies before it prepares an invoice.'
@@ -238,6 +246,8 @@ export function App() {
                     )
                     : route.page === 'audit'
                       ? <Audit events={state.events} />
+                      : route.page === 'opportunities'
+                        ? <Opportunities />
                       : route.page === 'policy'
                         ? <Policy />
                         : (

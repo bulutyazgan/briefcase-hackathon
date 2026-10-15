@@ -8,6 +8,7 @@
     "pdf:sample": "bun src/sample-pdf.tsx"
   },
   "dependencies": {
+    "@ai-sdk/fireworks": "^3.0.73",
     "@ai-sdk/openai": "^4",
     "@formepdf/core": "^0.28.0",
     "@formepdf/react": "^0.28.0",
