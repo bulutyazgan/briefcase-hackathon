@@ -17,7 +17,11 @@ Track rules we must hit: a real-world trigger (a conversation), a real Stripe te
 
 ## 2. The product in one sentence
 
-An always-on agent that lives in a lead-gen agency's client channels, hears a client commit to work, buys the leads from its supplier, and turns them into a policy-checked Stripe invoice with a receipt of why — then collects and delivers.
+An always-on agent that removes the formality from business: agreements are made in conversation (Slack, email, your app's chat) and the agent handles everything that used to follow them (quote, order in your system, fulfilment, invoice, VAT, collection, bookkeeping) inside a written policy, with a receipt of why for every pound.
+
+The conversation is the contract; the agent is the back office. Tonight's instance is a lead-gen agency: a client commits in the channel, Tally recalls the deal, prices it, buys the leads from its supplier, bills a Stripe invoice that cites the quote, the memory and the clause, collects, delivers and books it. The last mile (buying leads) is one **fulfilment adapter**; a campaign tool, a SaaS or a consultancy plugs in the same way.
+
+The formalities the agent absorbs, in the order a business feels them: capture (what was agreed, by whom, quoted verbatim) → terms (rate card, standing deals, entitlements, from memory) → commercial check (price, margin, limits, who may commit) → confirmation (one message that makes the agreement explicit; a quote or e-sign artefact when the deal needs one) → order in your app → fulfilment with evidence → invoice → collection → books. The agent is more formal than the people were, not less: it only acts on an explicit agreement with a verbatim quote, inside the catalogue and limits, and it writes the formal record itself.
 
 Who does what:
 

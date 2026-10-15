@@ -1,6 +1,8 @@
 # Tally
 
-Tally listens to a lead-gen agency's client channel, hears a client commit to an order, buys the leads, and bills them as a Stripe test-mode invoice that cites the quote, the memory, and the policy clause behind every line.
+Tally removes the formality from business. Agreements get made in conversation; Tally handles what used to follow them: the terms, the order, the fulfilment, the Stripe invoice with VAT, the chasing, the credit note, the books. It acts only inside a written policy and keeps a receipt of why for every pound.
+
+This build is the lead-gen agency instance: Tally sits in the client channel, hears a client commit to an order, recalls the deal from memory, buys the leads from its supplier, and bills a Stripe test-mode invoice that cites the quote, the memory fact and the policy clause behind every line, then collects, delivers and books it. Buying leads is one fulfilment adapter; the same agent, policy and audit trail work for a campaign tool, a SaaS or a consultancy.
 
 Built for the Stripe x Briefcase AI FinTech Hackathon, London, 15 Oct 2026. Track 02, Agents that collect.
 
