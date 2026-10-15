@@ -56,6 +56,7 @@ export async function createInvoice(
   const poNumber = extractPoNumber(getMessage(messageId)?.text ?? intent.ask)
   const invoice = await stripe.invoices.create({
     customer: customer.id,
+    currency: 'gbp',
     collection_method: 'send_invoice',
     days_until_due: 7,
     auto_advance: false,

@@ -1,14 +1,15 @@
 // Cognee Cloud HTTP client. One dataset per client (datasetName(clientName)).
 // Base URL comes only from COGNEE_BASE_URL; every request sends header `X-Api-Key`.
 //
-// POST {base}/api/v1/add       multipart/form-data:
-//                                data        = one text file (a tagged fact, see memory.ts encodeFact)
-//                                datasetName = "<client-slug>"
+// POST {base}/api/v1/remember multipart/form-data (verified against Cognee Cloud, 15 Oct 2026):
+//                                raw_data          = the tagged fact text (see memory.ts encodeFact)
+//                                datasetName       = "<client-slug>"
+//                                run_in_background = "false"   (indexed before the call returns)
 //                              response: any 2xx (body ignored)
 // POST {base}/api/v1/cognify   JSON { "datasets": ["<client-slug>"], "run_in_background": true }
-//                              response: any 2xx (body ignored)
-// POST {base}/api/v1/search    JSON { "query": "...", "search_type": "CHUNKS",
-//                                     "datasets": ["<client-slug>"], "top_k": 20 }
+//                              response: any 2xx (body ignored); kept for datasets added another way
+// POST {base}/api/v1/search    JSON { "query": "...", "searchType": "CHUNKS",
+//                                     "datasets": ["<client-slug>"], "topK": 20 }
 //                              response: any JSON; every string leaf is scanned for
 //                              tagged facts "[date=YYYY-MM-DD role=<role> source=<id> client=<slug>] text".
 //                              e.g. [{ "search_result": ["[date=... ] Pays on 7-day terms"] }]
@@ -65,9 +66,10 @@ export function createCogneeClient(config: CogneeConfig): CogneeClient {
   return {
     async add(dataset, text) {
       const body = new FormData()
-      body.append('data', new Blob([text], { type: 'text/plain' }), `${crypto.randomUUID()}.txt`)
+      body.set('raw_data', text)
       body.set('datasetName', dataset)
-      await call('/api/v1/add', { method: 'POST', body })
+      body.set('run_in_background', 'false')
+      await call('/api/v1/remember', { method: 'POST', body })
     },
     async cognify(dataset) {
       await call('/api/v1/cognify', {
@@ -80,7 +82,7 @@ export function createCogneeClient(config: CogneeConfig): CogneeClient {
       const response = await call('/api/v1/search', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ query, search_type: 'CHUNKS', datasets: [dataset], top_k: 20 }),
+        body: JSON.stringify({ query, searchType: 'CHUNKS', datasets: [dataset], topK: 20 }),
       })
       return collectStrings(await response.json())
     },

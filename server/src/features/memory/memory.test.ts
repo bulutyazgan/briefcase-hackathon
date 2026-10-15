@@ -52,9 +52,9 @@ describe('role-tagged memory', () => {
     const fakeFetch: FetchLike = async (url, init) => {
       calls.push(url)
       expect(new Headers(init?.headers).get('X-Api-Key')).toBe('test-key')
-      if (url.endsWith('/api/v1/add') && init?.body instanceof FormData) {
-        const file = init.body.get('data')
-        if (file instanceof Blob) stored.push(await file.text())
+      if (url.endsWith('/api/v1/remember') && init?.body instanceof FormData) {
+        const raw = init.body.get('raw_data')
+        if (typeof raw === 'string') stored.push(raw)
         expect(init.body.get('datasetName')).toBe('globex-partners')
       }
       if (url.endsWith('/api/v1/search')) return Response.json([{ search_result: stored }])
@@ -75,7 +75,7 @@ describe('role-tagged memory', () => {
       date: '2026-10-14',
     })
     expect(calls).toEqual([
-      'http://cognee.test/api/v1/add',
+      'http://cognee.test/api/v1/remember',
       'http://cognee.test/api/v1/cognify',
       'http://cognee.test/api/v1/search',
     ])

@@ -18,6 +18,7 @@ const netPence = 108_000
 const expected = vatBreakdown(netPence)
 const customer = await stripe.customers.create({ name: 'Tally books verification', email: 'books-verify@example.com' })
 const draft = await stripe.invoices.create({
+  currency: 'gbp',
   customer: customer.id,
   collection_method: 'send_invoice',
   days_until_due: 7,

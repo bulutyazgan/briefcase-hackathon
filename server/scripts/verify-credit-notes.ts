@@ -15,13 +15,13 @@ const customer = await stripe.customers.create(
   { name: 'Globex Partners', email: 'billing+globex@example.com' },
   { idempotencyKey: `verify-cn-customer-${runId}` },
 )
-await stripe.invoiceItems.create(
-  { customer: customer.id, amount: 120000, currency: 'gbp', description: 'Leads: 300 at £4.00 per lead' },
-  { idempotencyKey: `verify-cn-item-${runId}` },
-)
 const draft = await stripe.invoices.create(
-  { customer: customer.id, collection_method: 'send_invoice', days_until_due: 7 },
+  { customer: customer.id, currency: 'gbp', collection_method: 'send_invoice', days_until_due: 7 },
   { idempotencyKey: `verify-cn-invoice-${runId}` },
+)
+await stripe.invoiceItems.create(
+  { customer: customer.id, invoice: draft.id, amount: 120000, currency: 'gbp', description: 'Leads: 300 at £4.00 per lead' },
+  { idempotencyKey: `verify-cn-item-${runId}` },
 )
 const invoice = await stripe.invoices.finalizeInvoice(draft.id)
 console.info(`OK   invoice ${invoice.id} finalised for £${(invoice.total / 100).toFixed(2)}`)
