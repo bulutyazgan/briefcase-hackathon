@@ -16,7 +16,7 @@ import {
 } from '../ledger/store'
 import { createInvoice, BillingBlockedError, readStripeInvoiceStatus } from '../billing/billing'
 import { reply } from '../channels/channel'
-import { canonicalClientName, recallFacts, recallSeededFacts, rememberFact } from '../memory/memory'
+import { findClient, recallFacts, recallSeededFacts, rememberFact } from '../memory/memory'
 import { leadsCsv, seedLeads, sourceLeads, type Lead } from '../leads/leads'
 import { decide, type BillableIntent, type Decision, type MemoryFact } from '../policy/decide'
 import { renderInvoicePdf } from '../invoice-pdf/render'
@@ -82,14 +82,14 @@ function recordStep(
 function heuristicIntent(message: ChannelMessage): BillableIntent {
   const quantityMatch = message.text.match(/\b(\d{1,5})\s+(?:fintech\s+)?(?:CFO\s+)?leads?\b/i)
   const quantity = quantityMatch?.[1] ? Number(quantityMatch[1]) : null
-  const isClientMessage = /Client — Northwind/i.test(message.author) || message.channel.startsWith('slack:')
+  const authorName = message.author.replace(/^Client\s+[—–-]\s*/i, '').trim()
+  const isClientMessage = /^Client(?:\s|$)/i.test(message.author) || message.channel.startsWith('slack:')
+  const client = findClient(authorName)
   return {
     isCommitment: isClientMessage
       && /\b(let'?s|go ahead|order|kick off|please proceed)\b/i.test(message.text)
       && quantity !== null,
-    clientName: /northwind/i.test(message.author) || message.channel.startsWith('slack:')
-      ? 'Northwind Capital'
-      : message.author,
+    clientName: client?.name ?? authorName,
     ask: message.text,
     icp: /fintech/i.test(message.text) ? 'fintech CFOs in London' : message.text,
     quantity,
@@ -169,6 +169,7 @@ async function continueBilling(message: ChannelMessage, saved: SavedDecision): P
     try {
       pdfPath = await renderInvoicePdf({
         invoiceId: message.id,
+        clientName: intent.clientName,
         totalPence: decision.totalPence,
         lines: decision.lines,
       })
@@ -222,9 +223,7 @@ async function processMessage(message: ChannelMessage): Promise<void> {
     if (/\bwhy\b/i.test(message.text) && await explainLatestInvoice(message)) return
     const extracted = await extractIntent(message)
     const intent = extracted.intent
-    intent.clientName = message.channel === 'simulator' && message.author === 'Client — Northwind'
-      ? 'Northwind Capital'
-      : await canonicalClientName(intent.clientName)
+    intent.clientName = findClient(intent.clientName)?.name ?? intent.clientName
     const quoteValid = intent.quote.length > 0 && message.text.includes(intent.quote)
     if (!quoteValid) intent.isCommitment = false
     recordStep(message.id, 'extract', quoteValid ? 'Extracted a commitment and validated its verbatim quote.' : 'No valid source quote was found.', {
@@ -248,7 +247,7 @@ async function processMessage(message: ChannelMessage): Promise<void> {
       facts = await recallFacts(intent.clientName, intent.ask)
     } catch (error) {
       recordStep(message.id, 'recall', 'Cognee recall failed; using the seeded memory facts.', { error: String(error) })
-      facts = await recallSeededFacts('Northwind Capital')
+      facts = await recallSeededFacts(intent.clientName)
     }
     recordStep(message.id, 'recall', `Recalled ${facts.length} client memory facts.`, { facts })
 

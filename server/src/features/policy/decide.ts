@@ -1,3 +1,5 @@
+import { findClient } from '../memory/memory'
+
 export const RATE_PENCE = 400
 export const AUTO_SEND_LIMIT_PENCE = 100000
 export const MAX_DISCOUNT_PERCENT = 15
@@ -53,7 +55,7 @@ export function decide(
   availableCount = quantity,
 ): Decision {
   const clauses = ['P1', 'P2', 'P5', 'P6']
-  const clientIsKnown = /northwind capital/i.test(intent.clientName)
+  const clientIsKnown = findClient(intent.clientName) !== null
   if (!intent.isCommitment || !intent.quote || !intent.ask) {
     return { outcome: 'refuse', clauses, lines: [], totalPence: 0, reason: 'No explicit client commitment.' }
   }
@@ -73,7 +75,7 @@ export function decide(
   if (discountPercent > 0) clauses.push('P3')
   const clausesForLine = [...clauses, 'P4']
   const lines: PricedLine[] = [{
-    description: `Fintech CFO leads in London (${availableCount} sourced)`,
+    description: `${intent.icp.trim() || intent.ask.trim()} (${availableCount} sourced)`,
     quantity,
     unitPricePence: RATE_PENCE,
     totalPence,

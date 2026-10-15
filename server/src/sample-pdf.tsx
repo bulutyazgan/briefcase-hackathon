@@ -31,9 +31,10 @@ recordEvent({
 })
 const outputPath = await renderInvoicePdf({
   invoiceId: sampleId,
+  clientName: 'Sample client',
   totalPence: 108000,
   lines: [{
-    description: 'Fintech CFO leads in London (3 sourced)',
+    description: 'Sample lead list (3 sourced)',
     quantity: 300,
     unitPricePence: 400,
     totalPence: 108000,

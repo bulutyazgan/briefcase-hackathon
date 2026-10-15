@@ -1,6 +1,7 @@
 import Stripe from 'stripe'
-import type { BillableIntent, Decision } from '../policy/decide'
-import { getMessage, listInvoices, saveInvoice } from '../ledger/store'
+import { RATE_PENCE, type BillableIntent, type Decision } from '../policy/decide'
+import { findClient } from '../memory/memory'
+import { getInvoice, listInvoices, saveInvoice, type InvoiceRow } from '../ledger/store'
 
 export class BillingBlockedError extends Error {}
 
@@ -22,32 +23,42 @@ export async function createInvoice(
     return { stripeInvoiceId: existing.stripe_invoice_id, hostedUrl: existing.hosted_url }
   }
 
+  const client = findClient(intent.clientName)
+  if (!client) throw new Error('Cannot bill an unknown client.')
   const stripe = getStripe()
-  const sourceMessage = getMessage(messageId)
-  const email = 'billing+northwind@example.com'
-  const customerMatches = await stripe.customers.list({ email, limit: 1 })
+  const customerMatches = await stripe.customers.list({ email: client.email, limit: 1 })
   const customer = customerMatches.data[0] ?? await stripe.customers.create({
-    name: intent.clientName,
-    email,
+    name: client.name,
+    email: client.email,
+    metadata: { tally_client_id: client.id },
   }, { idempotencyKey: `customer-${messageId}` })
-
-  await Promise.all(decision.lines.map((line, index) => stripe.invoiceItems.create({
-    customer: customer.id,
-    amount: line.totalPence,
-    currency: 'gbp',
-    description: `${line.description}: ${line.quantity} at £4.00 per lead${
-      line.quantity * line.unitPricePence > line.totalPence
-        ? `; agreed discount £${((line.quantity * line.unitPricePence - line.totalPence) / 100).toFixed(2)}`
-        : ''
-    }`,
-  }, { idempotencyKey: `invoice-item-${messageId}-${index}` })))
 
   const invoice = await stripe.invoices.create({
     customer: customer.id,
     collection_method: 'send_invoice',
     days_until_due: 7,
-    metadata: { message_id: messageId, decision_clauses: decision.clauses.join(',') },
+    auto_advance: false,
+    metadata: {
+      message_id: messageId,
+      client_id: client.id,
+      decision_clauses: decision.clauses.join(','),
+    },
   }, { idempotencyKey: `invoice-${messageId}` })
+
+  for (const [index, line] of decision.lines.entries()) {
+    await stripe.invoiceItems.create({
+      customer: customer.id,
+      invoice: invoice.id,
+      amount: line.totalPence,
+      currency: 'gbp',
+      description: `${line.description}: ${line.quantity} at £${(RATE_PENCE / 100).toFixed(2)} per lead${
+        line.quantity * line.unitPricePence > line.totalPence
+          ? `; agreed discount £${((line.quantity * line.unitPricePence - line.totalPence) / 100).toFixed(2)}`
+          : ''
+      }`,
+    }, { idempotencyKey: `invoice-item-${messageId}-${index}` })
+  }
+
   const finalized = await stripe.invoices.finalizeInvoice(invoice.id, {}, {
     idempotencyKey: `finalize-${messageId}`,
   })
@@ -64,6 +75,29 @@ export async function createInvoice(
     pdf_path: null,
   })
   return { stripeInvoiceId: finalized.id, hostedUrl }
+}
+
+export async function simulateInvoicePayment(invoiceId: string): Promise<void> {
+  const invoice = getInvoice(invoiceId)
+  if (!invoice?.stripe_invoice_id || !invoice.client_id || invoice.status !== 'open') {
+    throw new Error('Only an open Stripe invoice can use the test-card payment.')
+  }
+
+  const stripe = getStripe()
+  const paymentMethod = await stripe.paymentMethods.retrieve('pm_card_visa')
+  const attachedCustomerId = typeof paymentMethod.customer === 'string'
+    ? paymentMethod.customer
+    : paymentMethod.customer?.id ?? null
+  if (attachedCustomerId && attachedCustomerId !== invoice.client_id) {
+    throw new Error('The test card is attached to another customer.')
+  }
+  if (!attachedCustomerId) {
+    await stripe.paymentMethods.attach('pm_card_visa', { customer: invoice.client_id })
+  }
+  await stripe.invoices.pay(invoice.stripe_invoice_id, {
+    paid_out_of_band: false,
+    payment_method: 'pm_card_visa',
+  }, { idempotencyKey: `simulate-payment-${invoice.id}` })
 }
 
 export async function readStripeInvoiceStatus(stripeInvoiceId: string): Promise<string> {

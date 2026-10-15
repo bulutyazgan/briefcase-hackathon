@@ -2,7 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Document, Page, StyleSheet, Text, View } from '@formepdf/react'
 import { renderDocument } from '@formepdf/core'
-import type { PricedLine } from '../policy/decide'
+import { RATE_PENCE, type PricedLine } from '../policy/decide'
 
 const styles = StyleSheet.create({
   title: { fontSize: 24, fontWeight: 700, marginBottom: 20 },
@@ -15,6 +15,7 @@ const styles = StyleSheet.create({
 
 interface PdfInvoice {
   invoiceId: string
+  clientName: string
   totalPence: number
   lines: PricedLine[]
 }
@@ -29,13 +30,13 @@ export async function renderInvoicePdf(invoice: PdfInvoice): Promise<string> {
       <Page size="A4" margin={48}>
         <Text style={styles.title}>Tally invoice</Text>
         <Text style={styles.text}>Invoice reference: {invoice.invoiceId}</Text>
-        <Text style={styles.text}>Bill to: Northwind Capital</Text>
+        <Text style={styles.text}>Bill to: {invoice.clientName}</Text>
         <Text style={styles.text}>Payment terms: 7 days</Text>
         <View style={styles.rule} />
         {invoice.lines.map((line, index) => (
           <View key={`${line.description}-${index}`} style={styles.row}>
             <View>
-              <Text style={styles.text}>{line.description} · {line.quantity} × £4.00</Text>
+              <Text style={styles.text}>{line.description} · {line.quantity} × {pounds(RATE_PENCE)}</Text>
               {line.quantity * line.unitPricePence > line.totalPence && (
                 <Text style={styles.muted}>
                   Agreed discount: {pounds(line.quantity * line.unitPricePence - line.totalPence)}

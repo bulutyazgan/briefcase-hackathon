@@ -1,6 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
+import { useState } from 'react'
 import type { AppState, InvoiceRow } from '../../api'
-import { evidenceFromEvent } from './api'
+import { evidenceFromEvent, simulateInvoicePayment } from './api'
 import { styles } from './invoices.stylex'
 
 interface InvoicesProps {
@@ -14,10 +15,25 @@ function formatMoney(amountPence: number): string {
 }
 
 function InvoiceDetail({ invoice, state }: { invoice: InvoiceRow; state: AppState }) {
+  const [paying, setPaying] = useState(false)
+  const [paymentError, setPaymentError] = useState('')
   const decisionEvent = state.events.find((event) =>
     event.message_id === invoice.message_id && event.step === 'decide',
   )
   const evidence = evidenceFromEvent(decisionEvent)
+
+  async function payWithTestCard(): Promise<void> {
+    setPaying(true)
+    setPaymentError('')
+    try {
+      await simulateInvoicePayment(invoice.id)
+    } catch (error) {
+      setPaymentError(error instanceof Error ? error.message : 'Test payment failed.')
+    } finally {
+      setPaying(false)
+    }
+  }
+
   return (
     <div {...stylex.props(styles.detail)}>
       <p {...stylex.props(styles.amount)}>{formatMoney(invoice.total_pence)}</p>
@@ -27,6 +43,19 @@ function InvoiceDetail({ invoice, state }: { invoice: InvoiceRow; state: AppStat
         <a href={`/api/invoices/${invoice.id}/pdf`} target="_blank" rel="noreferrer" {...stylex.props(styles.link)}>View PDF</a>
         <a href={`/api/leads/${invoice.id}.csv`} {...stylex.props(styles.link)}>Download lead list</a>
       </div>
+      {invoice.status === 'open' && invoice.stripe_invoice_id && (
+        <div {...stylex.props(styles.paymentAction)}>
+          <button
+            type="button"
+            disabled={paying}
+            {...stylex.props(styles.paymentButton)}
+            onClick={() => void payWithTestCard()}
+          >
+            {paying ? 'Paying with test card…' : 'Pay as client (test card)'}
+          </button>
+          {paymentError && <p role="alert" {...stylex.props(styles.paymentError)}>{paymentError}</p>}
+        </div>
+      )}
       <h3 {...stylex.props(styles.evidenceTitle)}>Evidence for this invoice</h3>
       {evidence.length
         ? evidence.map((line, index) => (

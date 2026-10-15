@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { channelRoutes } from './features/channels/routes'
 import { startSlack } from './features/channels/slack'
 import { handleApproval, startAgentLoop } from './features/agent/agent'
+import { BillingBlockedError, simulateInvoicePayment } from './features/billing/billing'
 import { getApproval, getEvent, getInvoice, getState } from './features/ledger/store'
 import { leadsCsv } from './features/leads/leads'
 
@@ -28,6 +29,19 @@ app.post('/api/approvals/:id', async (context) => {
   if (approval.status !== 'pending') return context.json({ error: 'This approval is already closed.' }, 409)
   await handleApproval(messageId, parsed.data.action)
   return context.json({ status: parsed.data.action === 'approve' ? 'approved' : 'rejected' })
+})
+
+app.post('/api/invoices/:id/simulate-payment', async (context) => {
+  const invoiceId = context.req.param('id')
+  if (!getInvoice(invoiceId)) return context.json({ error: 'Invoice not found.' }, 404)
+  try {
+    await simulateInvoicePayment(invoiceId)
+    return context.json({ status: 'payment_submitted' })
+  } catch (error) {
+    const status = error instanceof BillingBlockedError ? 503 : 400
+    const message = error instanceof Error ? error.message : 'Test payment failed.'
+    return context.json({ error: message }, status)
+  }
 })
 
 app.get('/api/leads/:invoiceId.csv', (context) => {
