@@ -15,6 +15,7 @@ import { Inbox } from './features/inbox/view'
 import { InvoiceDetail, Invoices } from './features/invoices/view'
 import { Policy } from './features/policy/view'
 import { Leads } from './features/leads/view'
+import { Notifications, notificationsOf } from './features/notifications/view'
 import { navigate, usePath } from './router'
 
 type Route =
@@ -24,6 +25,7 @@ type Route =
   | { page: 'invoice-detail'; invoiceId: string }
   | { page: 'audit' }
   | { page: 'policy' }
+  | { page: 'notifications' }
   | { page: 'not-found' }
 
 function resolveRoute(path: string): Route {
@@ -32,6 +34,7 @@ function resolveRoute(path: string): Route {
   if (path === '/app/leads') return { page: 'leads' }
   if (path === '/app/audit') return { page: 'audit' }
   if (path === '/app/policy') return { page: 'policy' }
+  if (path === '/app/notifications') return { page: 'notifications' }
   const match = path.match(/^\/app\/invoices\/([^/]+)$/)
   if (match) {
     try {
@@ -93,6 +96,7 @@ function RouteContent({ route, state, leads, onRefresh }: { route: Route; state:
   if (route.page === 'leads') return <Leads state={state} leads={leads} />
   if (route.page === 'invoice-detail') return <InvoiceDetail state={state} invoiceId={route.invoiceId} onRefresh={onRefresh} />
   if (route.page === 'audit') return <Audit state={state} />
+  if (route.page === 'notifications') return <Notifications state={state} />
   return <Policy state={state} />
 }
 
@@ -119,7 +123,7 @@ export function App() {
         ? <RouteContent route={route} state={state} leads={leads ?? []} onRefresh={() => void refreshState()} />
         : <PageSkeleton route={route} error={false} onRetry={() => void refreshState()} />
 
-  return <AppShell path={path} invoiceCount={invoiceCount} pendingCount={pendingCount} leadsCount={leads?.length ?? 0}>
+  return <AppShell path={path} invoiceCount={invoiceCount} pendingCount={pendingCount} leadsCount={leads?.length ?? 0} notificationCount={state ? notificationsOf(state).length : 0}>
     <SkeletonSwap loading={loading} skeleton={<PageSkeleton route={route} error={false} onRetry={() => void refreshState()} />}>
       {contentToRender}
     </SkeletonSwap>
