@@ -54,6 +54,18 @@ export interface JournalLineRow {
   tax_rate: string
 }
 
+// A client onboarded in conversation (P12). Seeded clients stay in clients/clients.ts.
+export interface ClientRow {
+  id: string
+  name: string
+  aliases_json: string
+  billing_email: string
+  price_per_lead_pence: number
+  account_owner: string
+  source_message_id: string
+  created_at: string
+}
+
 export interface AppState {
   messages: ChannelMessage[]
   invoices: InvoiceRow[]
@@ -117,7 +129,51 @@ database.exec(`
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS clients (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    aliases_json TEXT NOT NULL,
+    billing_email TEXT NOT NULL,
+    price_per_lead_pence INTEGER NOT NULL,
+    account_owner TEXT NOT NULL,
+    source_message_id TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
 `)
+
+// Insert-once by id (the client slug): a replayed onboarding keeps the first row.
+export function saveClientOnce(client: Omit<ClientRow, 'created_at'>): boolean {
+  const result = database.query(`
+    INSERT OR IGNORE INTO clients (id, name, aliases_json, billing_email, price_per_lead_pence, account_owner, source_message_id, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    client.id,
+    client.name,
+    client.aliases_json,
+    client.billing_email,
+    client.price_per_lead_pence,
+    client.account_owner,
+    client.source_message_id,
+    new Date().toISOString(),
+  )
+  return result.changes > 0
+}
+
+export function listClients(): ClientRow[] {
+  return database.query<ClientRow, []>('SELECT * FROM clients ORDER BY created_at ASC').all()
+}
+
+export function getClient(clientId: string): ClientRow | null {
+  return database.query<ClientRow, [string]>('SELECT * FROM clients WHERE id = ?').get(clientId) ?? null
+}
+
+// Authors of the messages that produced invoices: how "first invoice" is decided for an onboarded client.
+export function listInvoiceAuthors(): string[] {
+  return database.query<{ author: string }, []>(`
+    SELECT DISTINCT messages.author AS author FROM invoices
+    JOIN messages ON messages.id = invoices.message_id
+  `).all().map((row) => row.author)
+}
 
 export function insertMessage(message: ChannelMessage): ChannelMessage {
   database.query(`
@@ -299,7 +355,7 @@ export function getState(): AppState {
 }
 
 export function resetLedger(): void {
-  database.exec('DELETE FROM events; DELETE FROM invoices; DELETE FROM approvals; DELETE FROM messages; DELETE FROM journal_lines;')
+  database.exec('DELETE FROM events; DELETE FROM invoices; DELETE FROM approvals; DELETE FROM messages; DELETE FROM journal_lines; DELETE FROM clients;')
 }
 
 export function getSetting(key: string): string | null {
