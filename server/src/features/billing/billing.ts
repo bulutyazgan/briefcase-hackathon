@@ -1,6 +1,7 @@
 import Stripe from 'stripe'
 import type { BillableIntent, Decision } from '../policy/decide'
-import { getMessage, listInvoices, saveInvoice } from '../ledger/store'
+import { findClient } from '../clients/clients'
+import { listInvoices, saveInvoice } from '../ledger/store'
 
 export class BillingBlockedError extends Error {}
 
@@ -9,7 +10,22 @@ function getStripe(): Stripe {
   if (!secretKey?.startsWith('sk_test_') && !secretKey?.startsWith('rk_test_')) {
     throw new BillingBlockedError('Stripe billing requires a key that starts with sk_test_ or rk_test_.')
   }
+  // Mock harness: STRIPE_API_BASE (e.g. http://127.0.0.1:4010) points the SDK at a local mock.
+  const apiBase = process.env.STRIPE_API_BASE
+  if (apiBase) {
+    const url = new URL(apiBase)
+    const protocol = url.protocol === 'http:' ? 'http' : 'https'
+    return new Stripe(secretKey, {
+      host: url.hostname,
+      port: url.port ? Number(url.port) : protocol === 'http' ? 80 : 443,
+      protocol,
+    })
+  }
   return new Stripe(secretKey)
+}
+
+function money(pence: number): string {
+  return `£${(pence / 100).toFixed(2)}`
 }
 
 export async function createInvoice(
@@ -23,11 +39,12 @@ export async function createInvoice(
   }
 
   const stripe = getStripe()
-  const sourceMessage = getMessage(messageId)
-  const email = 'billing+northwind@example.com'
+  const client = findClient(intent.clientName)
+  if (!client) throw new BillingBlockedError(`Unknown client "${intent.clientName}" (P5).`)
+  const email = client.billingEmail
   const customerMatches = await stripe.customers.list({ email, limit: 1 })
   const customer = customerMatches.data[0] ?? await stripe.customers.create({
-    name: intent.clientName,
+    name: client.name,
     email,
   }, { idempotencyKey: `customer-${messageId}` })
 
@@ -35,9 +52,9 @@ export async function createInvoice(
     customer: customer.id,
     amount: line.totalPence,
     currency: 'gbp',
-    description: `${line.description}: ${line.quantity} at £4.00 per lead${
+    description: `${line.description}: ${line.quantity} at ${money(line.unitPricePence)} per lead${
       line.quantity * line.unitPricePence > line.totalPence
-        ? `; agreed discount £${((line.quantity * line.unitPricePence - line.totalPence) / 100).toFixed(2)}`
+        ? `; agreed discount ${money(line.quantity * line.unitPricePence - line.totalPence)}`
         : ''
     }`,
   }, { idempotencyKey: `invoice-item-${messageId}-${index}` })))
