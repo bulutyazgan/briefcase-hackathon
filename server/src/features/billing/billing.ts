@@ -3,6 +3,7 @@ import type { BillableIntent, Decision } from '../policy/decide'
 import { findClient } from '../clients/clients'
 import { getMessage, listInvoices, saveInvoice } from '../ledger/store'
 import { extractPoNumber } from '../buyer/policy'
+import { ensureVatTaxRate } from '../books/vat-rate'
 
 export class BillingBlockedError extends Error {}
 
@@ -48,18 +49,9 @@ export async function createInvoice(
     name: client.name,
     email,
   }, { idempotencyKey: `customer-${messageId}` })
+  const vatTaxRateId = await ensureVatTaxRate(stripe)
 
-  await Promise.all(decision.lines.map((line, index) => stripe.invoiceItems.create({
-    customer: customer.id,
-    amount: line.totalPence,
-    currency: 'gbp',
-    description: `${line.description}: ${line.quantity} at ${money(line.unitPricePence)} per lead${
-      line.quantity * line.unitPricePence > line.totalPence
-        ? `; agreed discount ${money(line.quantity * line.unitPricePence - line.totalPence)}`
-        : ''
-    }`,
-  }, { idempotencyKey: `invoice-item-${messageId}-${index}` })))
-
+  // Draft first, items attached to it: since API 2022-08-01 pending items are not pulled into new invoices.
   const poNumber = extractPoNumber(getMessage(messageId)?.text ?? intent.ask)
   const invoice = await stripe.invoices.create({
     customer: customer.id,
@@ -68,6 +60,19 @@ export async function createInvoice(
     metadata: { message_id: messageId, decision_clauses: decision.clauses.join(','), ...(poNumber ? { po_number: poNumber } : {}) },
     ...(poNumber ? { description: `Purchase order ${poNumber}` } : {}),
   }, { idempotencyKey: `invoice-${messageId}` })
+  await Promise.all(decision.lines.map((line, index) => stripe.invoiceItems.create({
+    customer: customer.id,
+    invoice: invoice.id,
+    amount: line.totalPence,
+    currency: 'gbp',
+    tax_rates: [vatTaxRateId],
+    description: `${line.description}: ${line.quantity} at ${money(line.unitPricePence)} per lead${
+      line.quantity * line.unitPricePence > line.totalPence
+        ? `; agreed discount ${money(line.quantity * line.unitPricePence - line.totalPence)}`
+        : ''
+    }`,
+  }, { idempotencyKey: `invoice-item-${messageId}-${index}` })))
+
   const finalized = await stripe.invoices.finalizeInvoice(invoice.id, {}, {
     idempotencyKey: `finalize-${messageId}`,
   })

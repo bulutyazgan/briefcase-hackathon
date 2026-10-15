@@ -2,6 +2,7 @@ import { useState, useSyncExternalStore } from 'react'
 import * as stylex from '@stylexjs/stylex'
 import { getSnapshot, refreshState, subscribe } from './app-state'
 import { Audit } from './features/audit/view'
+import { Books } from './features/books/view'
 import { Control } from './features/control/view'
 import { Inbox } from './features/inbox/view'
 import { Invoices } from './features/invoices/view'
@@ -47,6 +48,7 @@ export function App() {
                     selectedInvoiceId={selectedInvoiceId}
                     onSelect={setSelectedInvoiceId}
                   />
+                  <Books />
                   <Audit events={state.events} />
                 </div>
               </div>
