@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
-import { insertMessage } from '../ledger/store'
+import { getLatestThreadForAuthor, insertMessage } from '../ledger/store'
 
 const messageInput = z.object({
   author: z.string().min(1).default('Client — Northwind'),
@@ -17,7 +17,7 @@ channelRoutes.post('/simulator/messages', async (context) => {
   const message = insertMessage({
     id,
     channel: 'simulator',
-    thread: parsed.data.thread ?? id,
+    thread: parsed.data.thread ?? getLatestThreadForAuthor('simulator', parsed.data.author) ?? id,
     author: parsed.data.author,
     text: parsed.data.text,
     ts: new Date().toISOString(),

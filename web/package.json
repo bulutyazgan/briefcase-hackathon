@@ -7,7 +7,10 @@
     "build": "vite build"
   },
   "dependencies": {
+    "@hugeicons/core-free-icons": "^4.3.5",
+    "@hugeicons/react": "^1.1.10",
     "@stylexjs/stylex": "0.19.1",
+    "motion": "^14.3.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },

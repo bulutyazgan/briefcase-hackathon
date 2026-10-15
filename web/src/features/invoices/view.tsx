@@ -1,79 +1,157 @@
+import { useState } from 'react'
 import * as stylex from '@stylexjs/stylex'
-import type { AppState, InvoiceRow } from '../../api'
-import { evidenceFromEvent } from './api'
-import { styles } from './invoices.stylex'
+import { HugeiconsIcon } from '@hugeicons/react'
+import { CreditCardIcon, Download01Icon } from '@hugeicons/core-free-icons'
+import type { AppState, EventRow, InvoiceRow } from '../../api'
+import { Button } from '../../components/ui/button'
+import { Page, Opening, Section } from '../../components/ui/page'
+import { DataTable } from '../../components/ui/data-table'
+import type { DataTableColumn } from '../../components/ui/data-table'
+import { StatStrip } from '../../components/ui/stat-strip'
+import { Text } from '../../components/ui/text'
+import { content } from '../../components/ui/content.stylex'
+import { motion } from '../../motion.stylex'
+import { useValueChanged } from '../../motion'
+import { Link, navigate } from '../../router'
+import { evidenceFromEvent, simulateInvoicePayment } from './api'
 
-interface InvoicesProps {
-  state: AppState
-  selectedInvoiceId: string
-  onSelect: (invoiceId: string) => void
+function money(pence: number): string {
+  return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(pence / 100)
 }
 
-function formatMoney(amountPence: number): string {
-  return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(amountPence / 100)
+// Cross-fades its colour when the status changes and pulses once, so "paid" is seen to happen.
+function StatusPill({ invoice }: { invoice: InvoiceRow }) {
+  const changed = useValueChanged(`invoice-status:${invoice.id}`, invoice.status)
+  return <span {...stylex.props(content.status, motion.tinted, changed && motion.pulse)}>{invoice.status === 'paid' ? 'Paid' : 'Open'}</span>
 }
 
-function InvoiceDetail({ invoice, state }: { invoice: InvoiceRow; state: AppState }) {
-  const decisionEvent = state.events.find((event) =>
-    event.message_id === invoice.message_id && event.step === 'decide',
-  )
-  const evidence = evidenceFromEvent(decisionEvent)
+function clientName(state: AppState, invoice: InvoiceRow): string {
+  const author = state.messages.find((message) => message.id === invoice.message_id)?.author
+  return author?.replace(/^Client — /, '') || invoice.client_id || 'Client not recorded'
+}
+
+function decisionEvent(state: AppState, invoice: InvoiceRow): EventRow | undefined {
+  return state.events.find((event) => event.message_id === invoice.message_id && (event.step === 'decide' || event.data_json.includes('"decision"')))
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
+function arithmetic(event: EventRow | undefined, totalPence: number): string {
+  if (!event) return `Invoice total: ${money(totalPence)}`
+  try {
+    const parsed: unknown = JSON.parse(event.data_json)
+    if (!isRecord(parsed) || !isRecord(parsed.decision) || !Array.isArray(parsed.decision.lines)) return `Invoice total: ${money(totalPence)}`
+    const line = parsed.decision.lines.find((value) => isRecord(value) && typeof value.quantity === 'number' && typeof value.unitPricePence === 'number')
+    if (!isRecord(line) || typeof line.quantity !== 'number' || typeof line.unitPricePence !== 'number') return `Invoice total: ${money(totalPence)}`
+    const subtotal = line.quantity * line.unitPricePence
+    const discount = subtotal - totalPence
+    return `${line.quantity} × ${money(line.unitPricePence)} = ${money(subtotal)}${discount > 0 ? ` − ${money(discount)} agreed discount` : ''} = ${money(totalPence)}`
+  } catch {
+    return `Invoice total: ${money(totalPence)}`
+  }
+}
+
+function leadCount(state: AppState, invoice: InvoiceRow): number {
+  const event = state.events.find((item) => item.message_id === invoice.message_id && item.step === 'size')
+  if (!event) return 0
+  try {
+    const parsed: unknown = JSON.parse(event.data_json)
+    return isRecord(parsed) && Array.isArray(parsed.leads) ? parsed.leads.length : 0
+  } catch {
+    return 0
+  }
+}
+
+export function Invoices({ state }: { state: AppState }) {
+  const open = state.invoices.filter((invoice) => invoice.status !== 'paid')
+  const total = state.invoices.reduce((sum, invoice) => sum + invoice.total_pence, 0)
+  const openTotal = open.reduce((sum, invoice) => sum + invoice.total_pence, 0)
+  const columns: DataTableColumn<InvoiceRow>[] = [
+    { key: 'id', label: 'Invoice ID', mono: true, render: (invoice) => invoice.id, sortValue: (invoice) => invoice.id, searchValue: (invoice) => invoice.id },
+    { key: 'client', label: 'Client', render: (invoice) => clientName(state, invoice), sortValue: (invoice) => clientName(state, invoice), searchValue: (invoice) => clientName(state, invoice) },
+    { key: 'leads', label: 'Leads', align: 'end', render: (invoice) => leadCount(state, invoice), sortValue: (invoice) => leadCount(state, invoice) },
+    { key: 'total', label: 'Total', align: 'end', mono: true, render: (invoice) => money(invoice.total_pence), sortValue: (invoice) => invoice.total_pence },
+    { key: 'status', label: 'Status', render: (invoice) => <StatusPill invoice={invoice} />, sortValue: (invoice) => invoice.status },
+    { key: 'issued', label: 'Issued', mono: true, render: (invoice) => new Date(invoice.created_at).toLocaleDateString('en-GB'), sortValue: (invoice) => invoice.created_at },
+  ]
   return (
-    <div {...stylex.props(styles.detail)}>
-      <p {...stylex.props(styles.amount)}>{formatMoney(invoice.total_pence)}</p>
-      <span {...stylex.props(styles.status)}>{invoice.status}</span>
-      <div {...stylex.props(styles.links)}>
-        {invoice.hosted_url && <a href={invoice.hosted_url} target="_blank" rel="noreferrer" {...stylex.props(styles.link)}>Open Stripe invoice</a>}
-        <a href={`/api/invoices/${invoice.id}/pdf`} target="_blank" rel="noreferrer" {...stylex.props(styles.link)}>View PDF</a>
-        <a href={`/api/leads/${invoice.id}.csv`} {...stylex.props(styles.link)}>Download lead list</a>
+    <Page>
+      <Opening title={openTotal ? `${money(openTotal)} still to collect` : 'All invoices are up to date'} lede="A clear view of every commitment turned into a Stripe invoice." tools={<Button variant="primary" onClick={() => window.location.assign('/app/inbox')}>Open inbox</Button>} />
+      <StatStrip items={[
+        { label: 'Invoices', value: state.invoices.length, mono: true },
+        { label: 'Outstanding', value: money(openTotal), mono: true },
+        { label: 'Total billed', value: money(total), mono: true },
+      ]} />
+      <Section title="Invoices" description="Select an invoice to review its evidence and PDF">
+        <DataTable rows={state.invoices} columns={columns} rowKey={(invoice) => invoice.id} onRowClick={(invoice) => navigate(`/app/invoices/${encodeURIComponent(invoice.id)}`)} searchPlaceholder="Search invoices" emptyTitle="No invoices have been created" emptyBody="Invoices will appear here after a client commitment is approved." />
+      </Section>
+    </Page>
+  )
+}
+
+export function InvoiceDetail({ state, invoiceId, onRefresh }: { state: AppState; invoiceId: string; onRefresh: () => void }) {
+  const invoice = state.invoices.find((item) => item.id === invoiceId)
+  const [paying, setPaying] = useState(false)
+  const [paymentError, setPaymentError] = useState('')
+  if (!invoice) {
+    return <Page><Opening title="This invoice is not in the ledger" lede="Check the invoice URL or return to the invoice list." tools={<Link to="/app/invoices" {...stylex.props(content.link)}>View invoices</Link>} /></Page>
+  }
+  const event = decisionEvent(state, invoice)
+  const evidence = evidenceFromEvent(event)
+  const client = clientName(state, invoice)
+  const paid = invoice.status === 'paid'
+  const invoicePath = `/api/invoices/${encodeURIComponent(invoice.id)}/pdf`
+
+  async function pay(): Promise<void> {
+    if (paying || paid) return
+    setPaying(true)
+    setPaymentError('')
+    try {
+      await simulateInvoicePayment(invoiceId)
+      onRefresh()
+    } catch (error) {
+      setPaymentError(String(error))
+    } finally {
+      setPaying(false)
+    }
+  }
+
+  return (
+    <Page>
+      <Opening
+        title={paid ? `${money(invoice.total_pence)} collected from ${client}` : `${money(invoice.total_pence)} awaiting payment`}
+        lede="The invoice, client agreement and policy decision are linked in one record."
+        tools={<>
+          {invoice.hosted_url ? <a href={invoice.hosted_url} target="_blank" rel="noreferrer" {...stylex.props(content.link)}>View Stripe invoice</a> : null}
+          <a href={invoicePath} download={`invoice-${invoice.id}.pdf`} {...stylex.props(content.link, content.iconLabel)}><HugeiconsIcon icon={Download01Icon} size={16} strokeWidth={1.5} aria-hidden="true" {...stylex.props(content.icon)} />Download PDF</a>
+          <Button variant="primary" disabled={paid || paying || !invoice.stripe_invoice_id} onClick={() => void pay()}><span {...stylex.props(content.iconLabel)}><HugeiconsIcon icon={CreditCardIcon} size={16} strokeWidth={1.5} aria-hidden="true" {...stylex.props(content.icon)} />{paying ? 'Processing payment' : 'Pay as client (test card)'}</span></Button>
+        </>}
+      />
+      {paid ? <Text role="compact">This invoice is already paid.</Text> : null}
+      {paymentError ? <p role="alert" {...stylex.props(content.error)}>{paymentError}</p> : null}
+      <div id="invoice-amount"><StatStrip items={[
+        { label: 'Amount', value: money(invoice.total_pence), mono: true },
+        { label: 'Status', value: <StatusPill invoice={invoice} /> },
+        { label: 'Client', value: client },
+        { label: 'Stripe invoice', value: invoice.stripe_invoice_id || 'Not created', mono: true },
+      ]} /></div>
+      <div {...stylex.props(content.twoCol)}>
+        <Section title="Invoice PDF" description="The customer-ready invoice and its evidence appendix">
+          <iframe title={`Invoice PDF for ${client}`} src={invoicePath} {...stylex.props(content.pdf)} />
+        </Section>
+        <Section title="Evidence trail" description="Why this amount was billed">
+          {evidence.length ? (
+            <div {...stylex.props(content.stack)}>
+              <div id="evidence-quote" {...stylex.props(content.evidence)}><Text role="label">Client quote</Text><Text role="compact">“{evidence[0].quote}”</Text></div>
+              <div id="evidence-memory" {...stylex.props(content.evidence)}><Text role="label">Remembered agreement</Text><Text role="compact">{evidence[0].memoryFact}</Text></div>
+              <div {...stylex.props(content.evidence)}><Text role="label">Arithmetic</Text><span {...stylex.props(content.math)}>{arithmetic(event, invoice.total_pence)}</span></div>
+              <div {...stylex.props(content.evidence)}><Text role="label">Policy clauses</Text><div {...stylex.props(content.clauseList)}>{evidence[0].clauses.map((clause) => <Link key={clause} to={`/app/policy#policy-${clause}`} {...stylex.props(content.clause)}>{clause}</Link>)}</div></div>
+            </div>
+          ) : <div {...stylex.props(content.well)}><Text role="compact">No evidence event is available for this invoice.</Text></div>}
+        </Section>
       </div>
-      <h3 {...stylex.props(styles.evidenceTitle)}>Evidence for this invoice</h3>
-      {evidence.length
-        ? evidence.map((line, index) => (
-          <div key={`${line.quote}-${index}`} {...stylex.props(styles.evidence)}>
-            <p {...stylex.props(styles.label)}>Client quote</p>
-            <blockquote {...stylex.props(styles.quote)}>“{line.quote}”</blockquote>
-            <p {...stylex.props(styles.label)}>Memory fact</p>
-            <p {...stylex.props(styles.fact)}>{line.memoryFact}</p>
-            <div {...stylex.props(styles.clauses)} aria-label="Policy clauses">
-              {line.clauses.map((clause) => <span key={clause} {...stylex.props(styles.clause)}>{clause}</span>)}
-            </div>
-          </div>
-        ))
-        : <p {...stylex.props(styles.fact)}>Evidence is not available for this invoice.</p>}
-    </div>
-  )
-}
-
-export function Invoices({ state, selectedInvoiceId, onSelect }: InvoicesProps) {
-  const selectedInvoice = state.invoices.find((invoice) => invoice.id === selectedInvoiceId) ?? state.invoices[0]
-  return (
-    <section {...stylex.props(styles.panel)} aria-labelledby="invoices-title">
-      <header {...stylex.props(styles.header)}>
-        <h2 id="invoices-title" {...stylex.props(styles.title)}>Invoices</h2>
-        <p {...stylex.props(styles.subtitle)}>Policy checked · evidence attached to each line</p>
-      </header>
-      {state.invoices.length
-        ? (
-          <>
-            <div {...stylex.props(styles.list)}>
-              {state.invoices.map((invoice) => (
-                <button
-                  key={invoice.id}
-                  type="button"
-                  aria-pressed={selectedInvoice?.id === invoice.id}
-                  {...stylex.props(styles.invoiceButton, selectedInvoice?.id === invoice.id && styles.selectedInvoice)}
-                  onClick={() => onSelect(invoice.id)}
-                >
-                  <span>{invoice.stripe_invoice_id ?? invoice.id.slice(0, 10)}</span>
-                  <span>{formatMoney(invoice.total_pence)} · {invoice.status}</span>
-                </button>
-              ))}
-            </div>
-            {selectedInvoice && <InvoiceDetail invoice={selectedInvoice} state={state} />}
-          </>
-        )
-        : <p {...stylex.props(styles.empty)}>No invoices yet. Send a commitment to see its price and evidence here.</p>}
-    </section>
+    </Page>
   )
 }

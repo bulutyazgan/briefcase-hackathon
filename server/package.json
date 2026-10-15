@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@ai-sdk/fireworks": "^3.0.72",
+    "@ai-sdk/openai": "^4",
     "@formepdf/core": "^0.28.0",
     "@formepdf/react": "^0.28.0",
     "@slack/bolt": "^4.6.0",

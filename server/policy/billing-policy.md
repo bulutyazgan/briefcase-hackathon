@@ -1,9 +1,31 @@
 # Billing policy
 
 - `P1` Bill only from a client message that contains an explicit commitment ("let's do", "go ahead", "order", a quantity).
-- `P2` Prices come from the rate card only. Lead list £4/lead, setup £0.
+- `P2` Prices come from the client's price list only (e.g. Northwind £4/lead, Acme £5/lead). The client is billed for leads actually bought and delivered.
 - `P3` Discounts only if remembered as agreed (Cognee fact with date) and never above 15%.
 - `P4` Auto-send invoices up to £1,000. Above that, one approval from the account owner.
-- `P5` Known clients only (Stripe customer exists or is in the client list). Unknown → ask, do not bill.
+- `P5` Known clients only (in the seeded client list). Unknown → ask, do not bill.
 - `P6` One invoice per commitment message (idempotency).
 - `P7` Reminders at most once per 24 h, and never after a remembered dispute.
+- `P8` Margin ≥ 40% over Treg sourcing cost, otherwise the invoice needs approval.
+- `P9` Sourcing spend caps: every Treg call carries `X-Treg-Route-Max-Cost`, and each order has a total sourcing cap. Code enforces both.
+- `P10` Treg calls only to an allowlist of catalogue endpoints (people, company, buying signals).
+- `P11` A client dispute about delivered leads earns a credit note for the leads the client says were invalid, capped at the number delivered, at the invoice's net price per lead. Auto-issue credit notes up to £200. Above that, one approval from the account owner. The dispute is remembered, so P7 stops reminders.
+- `P12` New clients are onboarded in conversation from the company knowledge base (Cognee dataset `company`): an unknown sender's question is answered from the price list, and when that sender commits in the same thread the client is created at the standard price list with no discounts. Their first invoice always needs one approval from the account owner, whatever the amount. A cold commitment with no prior inquiry stays unknown under P5.
+- `P13` A known client can change their subscription plan in conversation, only to a plan in the catalogue (lead list, 100 leads a month, billed monthly or yearly) at their price list rate. Discounts apply only when remembered (P3). A plan worth up to £12,000 net a year applies automatically; above that, one approval from the account owner. The Stripe subscription is created or updated with prorations, the plan is remembered, and staff get a note.
+
+## Opportunities
+
+Tally spots revenue (order cadence from memory, a need said in the channel, buying signals on target accounts) and offers it. Every gate decision is recorded with its clause.
+
+- `O1` Offers go only to known clients (the seeded list) and only for catalogue services (lead-list).
+- `O2` An offer worth up to £1,000 net is posted automatically. Above that, one approval from the account owner before it is posted.
+- `O3` At most one open offer per client, a 7-day cooldown after a decline or expiry, and never while a dispute is remembered.
+- `O4` An offer bills only after an explicit acceptance in the same thread that quotes it; the acceptance then runs the normal commitment path (P1 to P10).
+
+Notes for code: the order sourcing cap (P9) is 60% of the invoice net. Sourcing cost (micro-USD) is compared with invoice amounts (pence) at a fixed rate of 1 USD = 79p.
+
+## Guardrails
+
+- `F1` Kill switch. A `/pause` message in any channel stops all sourcing and billing. Only the account owner can `/resume`. While paused, every blocked step is recorded in the audit log with clause F1.
+- `F2` Least-privilege key. Tally runs on a Stripe restricted test key (`rk_test_`) with write access only to Customers, Invoices, Invoice items, Credit notes and Meter events. Even a prompt-injected agent cannot refund, pay out or create charges: Stripe rejects those calls.

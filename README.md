@@ -1,0 +1,203 @@
+# Tally
+
+Tally removes the formality from business. Agreements get made in conversation; Tally handles what used to follow them: the terms, the order, the fulfilment, the Stripe invoice with VAT, the chasing, the credit note, the books. It acts only inside a written policy and keeps a receipt of why for every pound.
+
+This build is the lead-gen agency instance: Tally sits in the client channel, hears a client commit to an order, recalls the deal from memory, buys the leads from its supplier, and bills a Stripe test-mode invoice that cites the quote, the memory fact and the policy clause behind every line, then collects, delivers and books it. Buying leads is one fulfilment adapter; the same agent, policy and audit trail work for a campaign tool, a SaaS or a consultancy.
+
+Built for the Stripe x Briefcase AI FinTech Hackathon, London, 15 Oct 2026. Track 02, Agents that collect.
+
+## Name
+
+Tally is the working title. The product name is Tally in the code, the UI, and these docs.
+
+## Work agreed in chat never gets invoiced
+
+A client writes "Let's kick off Q4. 300 fintech CFO leads in London, same deal as last time." in a chat thread. Someone has to remember the deal, price it, check the discount, buy the leads, raise the invoice, and chase it. When nobody does, the agency does the work and never bills it. Tally does those steps from the message itself, and no human types the invoice.
+
+## How the loop runs
+
+`server/src/features/agent/agent.ts` polls the ledger every 2 seconds and works the oldest unprocessed message through these steps. Each step writes an event to the SQLite ledger. The steps that apply policy (`extract`, `discount`, `price`, `decide`, `source`, `margin`, `approval`, `bill`, `render`, `deliver`, `explain`) record the clause ids they applied. The `recall`, `size`, and `remember` steps record their data and no clause.
+
+```
+client message (in-app simulator or Slack Socket Mode)
+  |
+  1 extract  LLM fills a typed intent (OpenAI, then Fireworks, then local rules); the quote must be a verbatim substring (P1)
+  2 recall   Cognee facts for this client, else server/seed/memory.json
+  3 price    code: price list x quantity - validated discount (P2, P3)
+  4 decide   code: auto | needs_approval | refuse, with clause ids (P4, P5)
+  5 approve  approval card in the Inbox when P4 or P8 requires it
+  6 buy      LLM proposes Treg calls; code accepts each one (P9, P10); one meter event per qualified lead
+  7 bill     Stripe customer, draft invoice, invoice items attached with the 20% UK VAT tax rate, finalize (idempotency key = message id, P6)
+  8 render   PDF invoice plus an evidence appendix page
+  9 deliver  reply in the thread with the hosted invoice, PDF, and lead CSV; on paid, post the leads and the journal
+ 10 explain  "why" in the same thread: quote, memory fact, clauses, Stripe invoice id
+  |
+  every step -> ledger (bun:sqlite event log) -> Audit page in the web app
+```
+
+Extraction tries the models in this order: OpenAI (`OPENAI_API_KEY`, model `OPENAI_MODEL`, default `gpt-5-mini`), then Fireworks (`FIREWORKS_API_KEY`), then the deterministic heuristics in `agent.ts` when neither key is set or every model call fails.
+
+Policy limits apply to the net amount. The demo order is 300 leads at £4 less 10%, which is £1,080.00 net. Stripe adds £216.00 VAT, so the invoice total is £1,296.00 gross. P4 compares the £1,080.00 net with its £1,000 limit.
+
+Two more timers run in the same process. One polls open Stripe invoices every 10 seconds and delivers the lead list once Stripe reports `paid`. The other runs the collections tick every 60 seconds and sends past-due reminders under P7. A client dispute in an invoice's thread goes to `credit-notes/credit-notes.ts`, which issues a Stripe credit note under P11.
+
+The LLM extracts and explains. Code decides and executes. Prices, limits, approvals, sourcing spend, and Stripe calls never come straight from model output.
+
+## Pay an invoice
+
+Two paths pay an open invoice in test mode.
+
+- The **Pay as client (test card)** button on an invoice page calls `POST /api/invoices/:id/simulate-payment`, which attaches Stripe's `pm_card_visa` test card to the customer and pays the invoice (`billing/billing.ts`, `simulateInvoicePayment`).
+- The Northwind procurement agent in `server/src/features/buyer/` pays its own orders under `server/policy/buyer-policy.md`. `POST /api/buyer/start` posts its PO order into the simulator channel. The web app has no button for it yet.
+
+## Autonomy with control
+
+`server/policy/billing-policy.md` holds the billing policy. `server/policy/buyer-policy.md` holds the policy of the Northwind procurement agent, a second actor that runs in the same process and buys from Tally. Code enforces each clause and the audit log cites it by id.
+
+| Clause | Rule | Enforced in |
+| --- | --- | --- |
+| `P1` | Bill only from a message with an explicit commitment and a verbatim quote. | `agent/agent.ts` |
+| `P2` | Prices come from the client's price list only (Northwind £4, Acme £5, Globex £4 per lead). Bill only leads bought. | `clients/clients.ts`, `pricing/order.ts` |
+| `P3` | Discounts only if remembered with a date, never above 15%. | `pricing/discount.ts`, `policy/decide.ts` |
+| `P4` | Auto-send up to £1,000 net. Above that, the account owner approves. | `policy/decide.ts` |
+| `P5` | Known clients only. An unknown sender is refused. | `policy/decide.ts`, `billing/billing.ts` |
+| `P6` | One invoice per commitment message. | `billing/billing.ts` |
+| `P7` | Reminders at most once per 24 hours, never after a remembered dispute. | `collections/collections.ts` |
+| `P8` | Margin of at least 40% over sourcing cost, otherwise approval. | `pricing/pricing.ts` |
+| `P9` | Every Treg call carries `X-Treg-Route-Max-Cost`, and each order has a sourcing cap of 60% of the invoice net. | `leads/providers/treg/` |
+| `P10` | Treg calls only to an allowlist of catalogue endpoints. | `leads/providers/treg/treg-catalog.ts` |
+| `P11` | A dispute earns a credit note for the invalid leads, capped at the number delivered, at the net price per lead. Auto-issue up to £200, above that the account owner approves. | `credit-notes/credit-notes.ts` |
+| `P12` | New clients are onboarded in conversation from the company knowledge base: an unknown sender's question is answered from the price list, and a commitment in the same thread creates the client at the standard price with no discounts. The first invoice always needs the account owner's approval. | `intake/intake.ts`, `clients/clients.ts` |
+| `P13` | A known client changes plan in conversation only within the catalogue (lead list, 100 leads a month, monthly or yearly) at their rate, discounts only when remembered. Up to £12,000 net a year applies automatically, above that the account owner approves. Stripe subscription created or updated with prorations, plan remembered, staff noted. | `subscriptions/subscriptions.ts`, `subscriptions/catalogue.ts` |
+| `O1`–`O4` | Opportunities: Tally spots revenue (quarterly cadence from memory, a need voiced in the channel, buying signals from the lead gateway) and posts an offer only to known clients for catalogue services, automatically up to £1,000 net, one open offer per client with a 7-day cooldown and never during a dispute; it bills only after an explicit acceptance in the same thread, through the normal commitment path. | `opportunities/opportunities.ts` |
+| `B1` | Buyer: gross spend this calendar month stays at or below £1,500. Over-budget offers and invoices are rejected. | `buyer/policy.ts`, `buyer/buyer.ts` |
+| `B2` | Buyer: the net price per lead on every invoice line is at most £5.00. | `buyer/policy.ts` |
+| `B3` | Buyer: every order carries a PO number, and an invoice is paid only when its `po_number` metadata matches. | `buyer/policy.ts`, `buyer/buyer.ts` |
+| `F1` | `/pause` in any channel stops sourcing and billing. Only the account owner can `/resume`. | `control/control.ts` |
+| `F2` | Tally is meant to run on a restricted test key (`rk_test_`). The scope list in `control/control.ts` is the documented least-privilege set: Customers, Invoices, Invoice items, Credit notes, and Meter events. | `control/control.ts`, `billing/billing.ts` |
+
+`billing.ts` refuses any key that does not start with `sk_test_` or `rk_test_`. Stripe enforces the F2 scopes only when you create the key as a restricted key with those scopes. A full `sk_test_` key is accepted and bills. The Guardrails panel (`web/src/features/control/`) then shows the warning label "Full secret key (sk_test_) — switch to restricted". With an `rk_test_` key it shows "Restricted key (rk_test_)" and the scope list. Another agent is adding that panel to the `/app/policy` page. Until then `GET /api/control` returns the same data.
+
+## Explains every pound
+
+- Each invoice line stores the client quote, the memory fact, and the policy clauses it used.
+- Page 2 of the PDF is the evidence appendix, titled "Why we billed this.", with that quote, fact, and clause list per line. `server/src/features/invoice-pdf/render.tsx` renders both pages.
+- The invoice page at `/app/invoices/:id` shows the evidence, the PDF in a frame, **Open PDF**, **Download lead list**, and **Open Stripe invoice** for the hosted page.
+- The Audit page at `/app/audit` lists the ledger events. The `source` event holds every Treg call, its cost, and the cap it ran under. Provider names stay in this internal log and never reach the client.
+- `server/src/features/books/` posts double-entry journals per invoice (debtors, sales, 20% VAT, sourcing cost, margin) and exports them as CSV. Another agent is adding the Books page at `/app/books`.
+- A message containing "why" in the invoice's thread gets a reply with the quote, the memory fact, the clauses, and the Stripe invoice id.
+
+## How Tally maps to the judging criteria
+
+| Points | Criterion | What Tally does |
+| --- | --- | --- |
+| 35 | Works end to end | Creates and finalizes a real Stripe test invoice from a chat message, then delivers the leads when Stripe reports `paid`. |
+| 25 | Autonomy with control | Code enforces `P1` to `P11`, `O1` to `O4`, `F1`, and `F2` on the seller side and `B1` to `B3` on the buyer side. Approval cards, a kill switch, a restricted key, and sourcing spend caps. |
+| 20 | Explains every pound | Quote, memory fact, and clause per line, a PDF evidence appendix, an audit timeline, journals, and "why" answers in the thread. |
+| 20 | Product and creativity | Catches revenue leakage at the moment the client commits, buys the work at a cost, bills it at a margin, and negotiates with the client's own buying agent. |
+
+## Run it locally
+
+You need [Bun](https://bun.sh) 1.3 or later.
+
+1. Install the dependencies.
+
+	```sh
+	bun install
+	```
+
+2. Copy the example environment file and fill in the keys you have. `server/.env.example` describes each variable.
+
+	```sh
+	cp server/.env.example server/.env
+	```
+
+	Use a Stripe test key only. `STRIPE_SECRET_KEY` must start with `sk_test_` or `rk_test_`, otherwise billing is blocked and logged.
+
+3. Reset the ledger.
+
+	```sh
+	bun run seed
+	```
+
+4. Start the API on port 8787 and the web app on port 5173.
+
+	```sh
+	bun run dev
+	```
+
+5. Open `http://localhost:5173`. The landing page is at `/`. The dashboard is under `/app`, with the pages `/app/inbox` (client channel, composer, approval cards), `/app/invoices`, `/app/invoices/:id`, `/app/audit`, and `/app/policy`. Send a message from the composer on the Inbox page.
+
+Each missing key has a fallback, so the loop runs with only a Stripe key:
+
+- Without `OPENAI_API_KEY`, extraction tries Fireworks. Without `FIREWORKS_API_KEY` too, extraction, discount parsing, and the Treg proposal use local rules.
+- Without `COGNEE_API_KEY`, recall reads `server/seed/memory.json`.
+- Without `TREG_TOKEN`, sourcing uses Firecrawl if `FIRECRAWL_API_KEY` is set, else the 400 synthetic leads in `server/seed/leads.csv`.
+- Without the Slack tokens, the in-app simulator is the only channel.
+
+### Run the mock harness
+
+`bun run e2e` drives the real web UI and server in headless Chromium against local replicas of Stripe, Treg, and Cognee. It starts the mocks on port 4010, the Vite dev server on port 5179, and a fresh server per scenario on port 8797, so a `bun run dev` on 8787 can keep running. No real provider is reached. `e2e/README.md` lists the scenarios, the mock behaviour, and what the harness does not prove. Agents use the `verify-tally` skill in `.claude/skills/verify-tally/` to run one scenario or drive the stack by hand and capture screenshot and mock-log proof.
+
+### Run the tests and the verify scripts
+
+Run the unit tests from `server/`.
+
+```sh
+cd server && TALLY_DB_PATH=:memory: bun test
+```
+
+The 72 tests in 11 files cover books, the buyer agent, clients, collections, control, credit notes, memory, meters, pricing, and the Treg and fallback sourcers. They call no outside service. To point the Stripe SDK at a local mock, set `STRIPE_API_BASE`.
+
+Eight scripts in `server/scripts/` call the real services once the matching key is set. Run each from `server/`.
+
+| Script | Proves | Command |
+| --- | --- | --- |
+| `verify-books.ts` | A 20% exclusive GB VAT rate and a taxed invoice. | `STRIPE_SECRET_KEY=sk_test_... bun scripts/verify-books.ts` |
+| `verify-buyer.ts` | A small invoice with a PO passes B1 to B3 and the buyer pays it with `pm_card_visa`. | `STRIPE_SECRET_KEY=sk_test_... bun scripts/verify-buyer.ts` |
+| `verify-control.ts` | A restricted `rk_test_` key cannot refund, pay out, or charge (F2). | `STRIPE_SECRET_KEY=rk_test_... bun scripts/verify-control.ts` |
+| `verify-credit-notes.ts` | A finalized invoice, then a credit note for invalid leads (P11). | `STRIPE_SECRET_KEY=sk_test_... bun scripts/verify-credit-notes.ts` |
+| `verify-memory.ts` | Adds one role-tagged fact to Cognee Cloud and searches it back. | `COGNEE_API_KEY=... COGNEE_BASE_URL=... bun scripts/verify-memory.ts` |
+| `verify-meters.ts` | Creates or finds the `qualified_lead` meter and sends one meter event. | `STRIPE_SECRET_KEY=sk_test_... bun scripts/verify-meters.ts` |
+| `verify-treg.ts` | One real, cheap Treg call to `apollo.people.search`. | `TREG_TOKEN=... bun scripts/verify-treg.ts` |
+| `verify-intake.ts` | Seeds the company knowledge base in Cognee, then posts the Initech inquiry and commitment to a scratch server and prints the onboarded client row and the P12 approval. | `bun scripts/verify-intake.ts` (reads `server/.env`) |
+
+What is proven against the real service so far: Treg sourcing. `bun scripts/verify-treg.ts` with the team token bought 3 leads for 2,000 micro-USD through `apollo.people.search`. Stripe billing is proven against the mock harness only, not against the Stripe test API.
+
+## Stack and sponsors
+
+- **Stripe** test mode for customers, tax rates, invoice items, invoices, credit notes, meter events, test-card payments, and the hosted invoice page.
+- **OpenAI** (`gpt-5-mini` by default) and **Fireworks** models through the AI SDK for extraction, discount parsing, and Treg proposals.
+- **Cognee** Cloud for client memory, with one dataset per client and role-tagged facts.
+- **Treg** (`treg.to`) as the lead supplier, with a cost on every call.
+- **Forme** (`@formepdf/react` for the document tree and `@formepdf/core` for `renderDocument`) renders the invoice PDF and its evidence appendix in `server/src/features/invoice-pdf/render.tsx`. The pdfcn invoice block from `PLAN.md` is not used.
+- Hono on Bun with `bun:sqlite` for the server. Vite, React 19, and StyleX for the web app. Slack Bolt for Socket Mode.
+
+## Team
+
+Louis and Bulut, with Claude agents building the layers in parallel.
+
+## Research: open-source projects we borrow from next
+
+A six-angle sweep (billing platforms, usage metering, finance agents, conversation-to-commerce, agency scope tools, policy engines and ledgers) scored real repositories on fit with this track, value to a finance team and feasibility. The mechanisms worth adopting:
+
+| Project | Licence | Mechanism we adopt |
+|---|---|---|
+| [Lago](https://github.com/getlago/lago) | AGPL-3.0 (core); agent SDKs/MCP server MIT in separate repos. Dunning and credit notes are premium features in the hosted product but the models live in the open-source lago-api. | (1) DunningCampaign model: days_between_attempts (>0, default 1), max_attempts (>0, default 1), bcc_emails, has_many thresholds (DunningCampaignThreshold: amount_cents >= 0, currency unique per campaign), applied at orga |
+| [Kill Bill](https://github.com/killbill/killbill) | Apache-2.0 | (1) Overdue system as declarative config (overdue.xml -> accountOverdueStates): an ordered list of named states, each with a condition (timeSinceEarliestUnpaidInvoiceEqualsOrExceeds, number of unpaid invoices, unpaid bal |
+| [agent-policy-engine](https://github.com/Princeu3/agent-policy-engine) | MIT (README "License": MIT © 2026; NOTICE credits the MIT-licensed Conway-Research/automaton it was extracted from) | Rules run in ascending priority; `deny` stops evaluation; `quarantine` is recorded but does not stop later rules, so a later `deny` still wins. `createDefaultRules({ ...DEFAULT_TREASURY_POLICY, maxSingleTransferCents: 20 |
+| [Cedar](https://github.com/cedar-policy/cedar) | Apache-2.0 | Three borrowable shapes: (1) `Response::decision()` + `Response::diagnostics()`, where `Diagnostics::reason()` yields exactly the PolicyIds that determined the decision and `Diagnostics::errors()` yields evaluation error |
+| [Open Policy Agent](https://github.com/open-policy-agent/opa) | Apache-2.0 | The decision-log event schema: `decision_id` (unique per decision; also returned in the API response), `path` (which policy was queried), `input` (the exact input the policy saw), `result`, `bundles[].revision` (which ve |
+| [x402-spendguard](https://github.com/baby-zack-agent/x402-spendguard) | MIT (README: "MIT — see LICENSE") | A published, fixed evaluation order: "denylist -> velocity freeze -> per-tx cap -> allowlist -> approval threshold -> rolling caps -> mission cap -> allow", decision in {allow, deny, needs_approval}, and only `allow` con |
+| [Documenso](https://github.com/documenso/documenso) | AGPL-3.0 (LICENSE at repo root; README license section) | The 'explicit agreement' data model. (1) Lifecycle enums: `DocumentStatus { DRAFT, PENDING, COMPLETED, REJECTED, CANCELLED }`, `RecipientRole { CC, SIGNER, VIEWER, APPROVER, ASSISTANT }`, `SigningStatus { NOT_SIGNED, SIG |
+| [Odoo](https://github.com/odoo/odoo) | LGPL-3.0 (LICENSE: "GNU LESSER GENERAL PUBLIC LICENSE Version 3, 29 June 2007") | A retainer/entitlement model plus built-in scope-creep (upsell) detection. Each service product carries a service_policy: 'ordered_prepaid' ("Prepaid/Fixed Price"), 'delivered_manual', 'delivered_milestones' ("Based on M |
+| [solidtime](https://github.com/solidtime-io/solidtime) | AGPL-3.0 (README: 'GNU Affero General Public License v3.0 (AGPL v3)') | Deterministic rate resolution by a fixed precedence chain, with the resolved rate stored on the entry and safe bulk re-pricing. BillableRateService::getBillableRateForTimeEntryWithGivenRelations() returns null immediatel |
+| [OpenMeter](https://github.com/openmeterio/openmeter) | Apache-2.0 | (1) Dedup key for events: `dedupe.Item{Namespace, ID, Source}` with `Key() = namespace-source-id`; interface `IsUnique / CheckUnique / Set / CheckUniqueBatch` with in-memory and Redis implementations ('Redis is optional  |
+
+Three product ideas came out of it, each a complete trigger → judgment → invoice flow on the same spine:
+
+- **Retainers that bill themselves (Tally Always-On).** A standing instruction said in chat ("keep the CFO leads coming, bill us every £500") becomes a usage threshold; the lead log raises each Stripe invoice the moment usage crosses it, and a code ladder chases only what is actually owed (total minus paid minus credits), citing a clause and a message on every touch.
+- **Change orders for service teams (scope creep that bills itself).** In a dev agency's project channel every "can you also…" is judged against the client's prepaid retainer: in-scope work burns entitlement, out-of-scope work becomes a quoted change order in the same thread, acceptance raises the Stripe invoice, and every hourly rate is resolved by a precedence chain and logged per line.
+- **Agent-to-agent trade with a verifiable deal certificate.** Northwind's procurement agent and Tally negotiate in the channel under their own policies, co-sign a deal envelope, and the Stripe invoice carries a sealed certificate plus a hash-chained audit trail a third party verifies in one click, with a trust model that stops either agent (or an injected message) from approving, pausing or raising limits.
+
+Recommendation from the sweep: Tonight (freeze 20:20, record 20:30): pitch the spine as built, with the six-beat 'Said, done, billed' demo already on main, and name idea 1 as the roadmap in one line at the video close and in the README: 'next, retainers that bill themselves at usage thresholds, and collections that chase what is owed, not what was invoiced'. Do not add code tonight. If a safe 30-minute slot opens before recording, the one addition worth making is owed = amount_remaining from a fresh invoices.retrieve in collections.ts (one dep plus one test), because it makes the Globex credit-note beat and the 'always on' reminder beat consistent on camera; everything else in this list is a rewrite of a tested tick and is not worth the risk at 20:20.

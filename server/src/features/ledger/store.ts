@@ -39,6 +39,33 @@ export interface ApprovalRow {
   reason: string
 }
 
+// One row per journal line; a journal is the set of rows sharing journal_id.
+export interface JournalLineRow {
+  journal_id: string
+  line_no: number
+  invoice_id: string
+  kind: string
+  reference: string
+  date: string
+  description: string
+  account: string
+  debit_pence: number
+  credit_pence: number
+  tax_rate: string
+}
+
+// A client onboarded in conversation (P12). Seeded clients stay in clients/clients.ts.
+export interface ClientRow {
+  id: string
+  name: string
+  aliases_json: string
+  billing_email: string
+  price_per_lead_pence: number
+  account_owner: string
+  source_message_id: string
+  created_at: string
+}
+
 export interface AppState {
   messages: ChannelMessage[]
   invoices: InvoiceRow[]
@@ -84,7 +111,69 @@ database.exec(`
     status TEXT NOT NULL,
     reason TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS journal_lines (
+    journal_id TEXT NOT NULL,
+    line_no INTEGER NOT NULL,
+    invoice_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    reference TEXT NOT NULL,
+    date TEXT NOT NULL,
+    description TEXT NOT NULL,
+    account TEXT NOT NULL,
+    debit_pence INTEGER NOT NULL,
+    credit_pence INTEGER NOT NULL,
+    tax_rate TEXT NOT NULL,
+    PRIMARY KEY (journal_id, line_no)
+  );
+  CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS clients (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    aliases_json TEXT NOT NULL,
+    billing_email TEXT NOT NULL,
+    price_per_lead_pence INTEGER NOT NULL,
+    account_owner TEXT NOT NULL,
+    source_message_id TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
 `)
+
+// Insert-once by id (the client slug): a replayed onboarding keeps the first row.
+export function saveClientOnce(client: Omit<ClientRow, 'created_at'>): boolean {
+  const result = database.query(`
+    INSERT OR IGNORE INTO clients (id, name, aliases_json, billing_email, price_per_lead_pence, account_owner, source_message_id, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    client.id,
+    client.name,
+    client.aliases_json,
+    client.billing_email,
+    client.price_per_lead_pence,
+    client.account_owner,
+    client.source_message_id,
+    new Date().toISOString(),
+  )
+  return result.changes > 0
+}
+
+export function listClients(): ClientRow[] {
+  return database.query<ClientRow, []>('SELECT * FROM clients ORDER BY created_at ASC').all()
+}
+
+export function getClient(clientId: string): ClientRow | null {
+  return database.query<ClientRow, [string]>('SELECT * FROM clients WHERE id = ?').get(clientId) ?? null
+}
+
+// Authors of the messages that produced invoices: how "first invoice" is decided for an onboarded client.
+export function listInvoiceAuthors(): string[] {
+  return database.query<{ author: string }, []>(`
+    SELECT DISTINCT messages.author AS author FROM invoices
+    JOIN messages ON messages.id = invoices.message_id
+  `).all().map((row) => row.author)
+}
 
 export function insertMessage(message: ChannelMessage): ChannelMessage {
   database.query(`
@@ -142,6 +231,14 @@ export function listEvents(messageId?: string): EventRow[] {
   return database.query<EventRow, []>('SELECT * FROM events ORDER BY created_at DESC LIMIT 250').all()
 }
 
+export function listEventsByStep(step: string): EventRow[] {
+  return database.query<EventRow, [string]>('SELECT * FROM events WHERE step = ? ORDER BY created_at ASC').all(step)
+}
+
+export function listThreadMessages(thread: string): ChannelMessage[] {
+  return database.query<ChannelMessage, [string]>('SELECT * FROM messages WHERE thread = ? ORDER BY ts ASC').all(thread)
+}
+
 export function saveInvoice(invoice: Omit<InvoiceRow, 'created_at'>): void {
   database.query(`
     INSERT OR IGNORE INTO invoices
@@ -180,6 +277,38 @@ export function listOpenInvoices(): InvoiceRow[] {
   `).all()
 }
 
+// Journals are append-only: a journal posted twice keeps its first version.
+export function postJournalLines(lines: JournalLineRow[]): void {
+  const insert = database.query(`
+    INSERT OR IGNORE INTO journal_lines
+      (journal_id, line_no, invoice_id, kind, reference, date, description, account, debit_pence, credit_pence, tax_rate)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `)
+  database.transaction(() => {
+    for (const line of lines) {
+      insert.run(
+        line.journal_id,
+        line.line_no,
+        line.invoice_id,
+        line.kind,
+        line.reference,
+        line.date,
+        line.description,
+        line.account,
+        line.debit_pence,
+        line.credit_pence,
+        line.tax_rate,
+      )
+    }
+  })()
+}
+
+export function listJournalLines(): JournalLineRow[] {
+  return database.query<JournalLineRow, []>(`
+    SELECT * FROM journal_lines ORDER BY date ASC, rowid ASC
+  `).all()
+}
+
 export function saveApproval(approval: ApprovalRow): void {
   database.query(`
     INSERT INTO approvals (id, message_id, status, reason) VALUES (?, ?, ?, ?)
@@ -197,6 +326,15 @@ export function getApproval(messageId: string): ApprovalRow | null {
 
 export function listApprovals(): ApprovalRow[] {
   return database.query<ApprovalRow, []>('SELECT * FROM approvals ORDER BY rowid DESC').all()
+}
+
+// The simulator composer has no thread picker: a new message from an author continues their latest thread,
+// so "Why £1,080?" and a dispute resolve against the invoice they are about.
+export function getLatestThreadForAuthor(channel: string, author: string): string | null {
+  const row = database.query<{ thread: string }, [string, string]>(
+    'SELECT thread FROM messages WHERE channel = ? AND author = ? ORDER BY ts DESC LIMIT 1',
+  ).get(channel, author)
+  return row?.thread ?? null
 }
 
 export function getLatestInvoiceForThread(thread: string): InvoiceRow | null {
@@ -217,5 +355,40 @@ export function getState(): AppState {
 }
 
 export function resetLedger(): void {
-  database.exec('DELETE FROM events; DELETE FROM invoices; DELETE FROM approvals; DELETE FROM messages;')
+  database.exec('DELETE FROM events; DELETE FROM invoices; DELETE FROM approvals; DELETE FROM messages; DELETE FROM journal_lines; DELETE FROM clients;')
+}
+
+export function getSetting(key: string): string | null {
+  const row = database.query<{ value: string }, [string]>('SELECT value FROM settings WHERE key = ?').get(key)
+  return row?.value ?? null
+}
+
+export function setSetting(key: string, value: string): void {
+  database.query(`
+    INSERT INTO settings (key, value) VALUES (?, ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+  `).run(key, value)
+}
+
+// Insert-once by deterministic id: returns false when the event was already recorded.
+export function recordEventOnce(event: Omit<EventRow, 'created_at'>): boolean {
+  const result = database.query(`
+    INSERT OR IGNORE INTO events (id, message_id, step, summary, data_json, policy_clause, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    event.id,
+    event.message_id,
+    event.step,
+    event.summary,
+    event.data_json,
+    event.policy_clause,
+    new Date().toISOString(),
+  )
+  return result.changes > 0
+}
+
+export function listStepEvents(messageId: string, step: string): EventRow[] {
+  return database.query<EventRow, [string, string]>(`
+    SELECT * FROM events WHERE message_id = ? AND step = ? ORDER BY created_at ASC, rowid ASC
+  `).all(messageId, step)
 }
