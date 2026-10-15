@@ -1,43 +1,40 @@
 import * as stylex from '@stylexjs/stylex'
+import { Section } from '../../components/ui/page'
+import { Text } from '../../components/ui/text'
+import { content } from '../../components/ui/content.stylex'
 import { keyModeLabel } from './api'
-import { useControlStatus } from './use-control-status'
 import { styles } from './control.stylex'
+import { useControlStatus } from './use-control-status'
 
 export function Control() {
   const { status, error } = useControlStatus()
+  const pill = status
+    ? <span role="status" {...stylex.props(content.status)}>{status.paused ? 'Paused · kill switch on' : 'Active'}</span>
+    : null
 
   return (
-    <section {...stylex.props(styles.panel)} aria-labelledby="control-title">
-      <header {...stylex.props(styles.header)}>
-        <h2 id="control-title" {...stylex.props(styles.title)}>Guardrails</h2>
-        {status && (
-          <span role="status" {...stylex.props(styles.pill, status.paused ? styles.paused : styles.active)}>
-            {status.paused ? 'Paused · kill switch on' : 'Active'}
-          </span>
-        )}
-      </header>
-      {error && <p role="alert" {...stylex.props(styles.row, styles.warning)}>{error}</p>}
-      {status && (
-        <>
-          <p {...stylex.props(styles.row)}>
-            Stripe key: <span {...stylex.props(styles.strong, status.keyMode !== 'restricted' && styles.warning)}>
-              {keyModeLabel[status.keyMode]}
-            </span>
-          </p>
-          <ul {...stylex.props(styles.scopes)} aria-label="Restricted key scopes">
-            {status.scopes.map((scope) => (
-              <li key={scope.resource} {...stylex.props(styles.scope)}>{scope.resource} · {scope.access}</li>
-            ))}
-          </ul>
-          <p {...stylex.props(styles.claim)}>
-            Even a prompt-injected agent cannot refund, pay out or create charges.
-          </p>
-          <p {...stylex.props(styles.row)}>
-            Send <span {...stylex.props(styles.strong)}>/pause</span> in any channel to stop billing and sourcing.
-            Only the account owner can <span {...stylex.props(styles.strong)}>/resume</span>.
-          </p>
-        </>
-      )}
-    </section>
+    <Section title="Guardrails" description="A restricted Stripe key and a kill switch bound what the agent can do" tools={pill}>
+      <div {...stylex.props(content.card, content.stack)}>
+        {error ? <p role="alert" {...stylex.props(content.error)}>{error}</p> : null}
+        {status ? (
+          <>
+            <div {...stylex.props(content.evidenceGrid)}>
+              <div {...stylex.props(content.evidence)}>
+                <Text role="label">Stripe key</Text>
+                <Text role="compact">{keyModeLabel[status.keyMode]}</Text>
+              </div>
+              <div {...stylex.props(content.evidence)}>
+                <Text role="label">Restricted key scopes</Text>
+                <ul aria-label="Restricted key scopes" {...stylex.props(content.clauseList, styles.scopes)}>
+                  {status.scopes.map((scope) => <li key={scope.resource} {...stylex.props(content.tag)}>{scope.resource} · {scope.access}</li>)}
+                </ul>
+              </div>
+            </div>
+            <Text role="body">Even a prompt-injected agent cannot refund, pay out or create charges.</Text>
+            <Text role="compact">Send /pause in any channel to stop billing and sourcing. Only the account owner can /resume.</Text>
+          </>
+        ) : null}
+      </div>
+    </Section>
   )
 }
