@@ -176,14 +176,16 @@ try {
 
   await beat('05-globex-late-and-dispute', async () => {
     await openInbox(page, webBase)
-    const seeded = (await ledger(apiBase)).invoices.find((row) => row.status === 'open' && !row.hosted_url)
-    if (!seeded) throw new Error('No seeded open Globex invoice; run demo:seed first.')
+    // The seed billed Globex's order 10 days ago; the collections tick (every 60 s) chases it.
+    const state = await ledger(apiBase)
+    const order = state.messages.find((message) => message.author === GLOBEX)
+    const seeded = state.invoices.find((row) => row.message_id === order?.id && row.status === 'open')
+    if (!order || !seeded) throw new Error('No seeded open Globex invoice; start the stack with E2E_SEED=demo.')
     const reminder = page.getByText(/Friendly reminder: invoice/).first()
     await reminder.waitFor({ timeout: 75000 })
     await showElement(reminder)
     await keyframe('05a-reminder')
-    const thread = (await ledger(apiBase)).messages.find((message) => message.id === seeded.message_id)?.thread ?? seeded.message_id
-    await postSimulatorMessage(apiBase, GLOBEX, GLOBEX_DISPUTE, thread)
+    await postSimulatorMessage(apiBase, GLOBEX, GLOBEX_DISPUTE, order.thread)
     const credit = page.getByText(/Credit note \S+ issued for £40\.00/).first()
     await credit.waitFor({ timeout: 30000 })
     await showElement(credit)
@@ -198,8 +200,9 @@ try {
     const thread = state.messages.find((message) => message.id === invoice?.message_id)?.thread
     if (!thread) throw new Error('No £1,080 invoice thread to ask about.')
     await postSimulatorMessage(apiBase, NORTHWIND, WHY, thread)
+    // The agent loop is serial, so the answer waits behind whatever message it is still on.
     const answer = page.getByText(/This invoice is £/).first()
-    await answer.waitFor({ timeout: 30000 })
+    await answer.waitFor({ timeout: 60000 })
     await showElement(answer)
   })
 
