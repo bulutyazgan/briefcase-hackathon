@@ -12,6 +12,7 @@
 - `P10` Treg calls only to an allowlist of catalogue endpoints (people, company, buying signals).
 - `P11` A client dispute about delivered leads earns a credit note for the leads the client says were invalid, capped at the number delivered, at the invoice's net price per lead. Auto-issue credit notes up to £200. Above that, one approval from the account owner. The dispute is remembered, so P7 stops reminders.
 - `P12` New clients are onboarded in conversation from the company knowledge base (Cognee dataset `company`): an unknown sender's question is answered from the price list, and when that sender commits in the same thread the client is created at the standard price list with no discounts. Their first invoice always needs one approval from the account owner, whatever the amount. A cold commitment with no prior inquiry stays unknown under P5.
+- `P13` A known client can change their subscription plan in conversation, only to a plan in the catalogue (lead list, 100 leads a month, billed monthly or yearly) at their price list rate. Discounts apply only when remembered (P3). A plan worth up to £12,000 net a year applies automatically; above that, one approval from the account owner. The Stripe subscription is created or updated with prorations, the plan is remembered, and staff get a note.
 
 ## Opportunities
 
