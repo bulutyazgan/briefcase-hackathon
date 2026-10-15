@@ -4,8 +4,7 @@ import { color, radius, space, text, weight } from '../../tokens/tokens.stylex'
 export const styles = stylex.create({
   root: { backgroundColor: color.canvas, minHeight: '100dvh', paddingBlock: space.md, paddingInline: space.lg, '@media (max-width: 700px)': { paddingInline: space.xs } },
   nav: { alignItems: 'center', display: 'flex', justifyContent: 'space-between', marginInline: 'auto', maxWidth: '1200px', paddingBlock: space.md, paddingInline: space.xs },
-  brand: { alignItems: 'center', color: color.ink, display: 'inline-flex', fontFamily: text.fontSans, fontSize: text.compact, fontWeight: weight.medium, gap: space.xs, textDecoration: 'none' },
-  dot: { backgroundColor: color.ink, borderRadius: '50%', height: '9px', width: '9px' },
+  brand: { alignItems: 'center', color: color.ink, display: 'inline-flex', fontFamily: text.fontSans, fontSize: text.compact, fontWeight: weight.medium, gap: space.sm, textDecoration: 'none' },
   links: { alignItems: 'center', display: 'flex', gap: space.lg, '@media (max-width: 520px)': { gap: space.sm } },
   navLink: { color: color.ink2, fontFamily: text.fontSans, fontSize: text.compact, textDecoration: 'none', ':hover': { color: color.ink } },
   content: { marginInline: 'auto', maxWidth: '1200px' },

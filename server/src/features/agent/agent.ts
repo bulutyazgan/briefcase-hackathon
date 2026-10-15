@@ -19,6 +19,7 @@ import { createInvoice, BillingBlockedError, readStripeInvoiceStatus } from '../
 import { vatBreakdownText } from '../books/books'
 import { syncBooks } from '../books/sync'
 import { reply } from '../channels/channel'
+import { sendTelegramPdf } from '../channels/telegram'
 import { canonicalClientName, recallFacts, recallSeededFacts, rememberFact } from '../memory/memory'
 import { leadsCsv, type Lead } from '../leads/leads'
 import { defaultSourcer } from '../leads/default-sourcer'
@@ -256,6 +257,7 @@ async function continueBilling(message: ChannelMessage, saved: SavedDecision): P
       `Lead list: ${leadUrl}`,
       availableNote,
     ].join('\n'))
+    if (pdfPath) await sendTelegramPdf(message, pdfPath, `Invoice ${result.stripeInvoiceId ?? ''} for £${(decision.totalPence / 100).toFixed(2)}`.replace('  ', ' ')).catch((error: unknown) => console.error(`Telegram PDF failed: ${String(error)}`))
     recordStep(message.id, 'deliver', 'Posted invoice, PDF and lead-list links to the source thread.', {
       hostedUrl: result.hostedUrl,
       pdfUrl,
@@ -283,7 +285,7 @@ async function requestApproval(
 ): Promise<void> {
   saveApproval({ id: message.id, message_id: message.id, status: 'pending', reason })
   recordStep(message.id, 'approval', 'Requested account-owner approval.', { amount, reason, clauses }, clauses)
-  await reply(message, `Approval required for ${amount}. ${reason} Review the approval card in Tally.`)
+  await reply(message, `Approval required for ${amount}. ${reason} Approve here or in Tally.`, [], { approvalFor: message.id })
 }
 
 // Decide, then buy, then bill: only runs once the order is auto-approved or approved (P4).

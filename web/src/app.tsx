@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
-import type { AppState } from './api'
+import type { AppState, SourcedLead } from './api'
 import { getSnapshot, refreshState, subscribe } from './app-state'
 import { AppShell } from './components/layout/app-shell'
 import { Button } from './components/ui/button'
@@ -14,11 +14,13 @@ import { Audit } from './features/audit/view'
 import { Inbox } from './features/inbox/view'
 import { InvoiceDetail, Invoices } from './features/invoices/view'
 import { Policy } from './features/policy/view'
+import { Leads } from './features/leads/view'
 import { navigate, usePath } from './router'
 
 type Route =
   | { page: 'inbox' }
   | { page: 'invoices' }
+  | { page: 'leads' }
   | { page: 'invoice-detail'; invoiceId: string }
   | { page: 'audit' }
   | { page: 'policy' }
@@ -27,6 +29,7 @@ type Route =
 function resolveRoute(path: string): Route {
   if (path === '/app/inbox') return { page: 'inbox' }
   if (path === '/app/invoices') return { page: 'invoices' }
+  if (path === '/app/leads') return { page: 'leads' }
   if (path === '/app/audit') return { page: 'audit' }
   if (path === '/app/policy') return { page: 'policy' }
   const match = path.match(/^\/app\/invoices\/([^/]+)$/)
@@ -53,9 +56,14 @@ function Placeholder({ error, shape = 'list' }: { error: boolean; shape?: 'list'
 }
 
 function PageSkeleton({ route, error, onRetry }: { route: Route; error: boolean; onRetry: () => void }) {
-  const title: ReactNode = error ? 'We could not load the ledger' : <SkeletonBar width="lg" height="control" />
-  const lede: ReactNode = error ? 'The ledger did not respond; retry now or wait for the next update.' : <SkeletonBar width="md" />
+  const title: ReactNode = error ? route.page === 'leads' ? 'We could not load the leads' : 'We could not load the ledger' : <SkeletonBar width="lg" height="control" />
+  const lede: ReactNode = error ? route.page === 'leads' ? 'The leads list did not respond; retry now or wait for the next update.' : 'The ledger did not respond; retry now or wait for the next update.' : <SkeletonBar width="md" />
   const tools = error ? <Button variant="primary" onClick={onRetry}>Retry</Button> : <SkeletonBar width="sm" height="control" />
+  if (route.page === 'leads') return <Page>
+    <Opening title={title} lede={lede} tools={tools} />
+    <StatStrip items={[{ label: 'Leads', value: error ? '—' : <SkeletonBar width="sm" /> }, { label: 'Delivered', value: error ? '—' : <SkeletonBar width="sm" /> }, { label: 'Awaiting payment', value: error ? '—' : <SkeletonBar width="sm" /> }]} />
+    <Section title="Lead directory" description={error ? undefined : 'Search sourced prospects and their invoices'}><Placeholder error={error} /></Section>
+  </Page>
   return (
     <Page>
       <Opening title={title} lede={lede} tools={tools} />
@@ -79,17 +87,18 @@ function NotFound() {
   return <Page><Opening title="This page is not available" lede="Choose a page from the sidebar to continue." /></Page>
 }
 
-function RouteContent({ route, state, onRefresh }: { route: Route; state: AppState; onRefresh: () => void }) {
+function RouteContent({ route, state, leads, onRefresh }: { route: Route; state: AppState; leads: SourcedLead[]; onRefresh: () => void }) {
   if (route.page === 'inbox') return <Inbox state={state} onRefresh={onRefresh} />
   if (route.page === 'invoices') return <Invoices state={state} />
+  if (route.page === 'leads') return <Leads state={state} leads={leads} />
   if (route.page === 'invoice-detail') return <InvoiceDetail state={state} invoiceId={route.invoiceId} onRefresh={onRefresh} />
   if (route.page === 'audit') return <Audit state={state} />
-  return <Policy />
+  return <Policy state={state} />
 }
 
 export function App() {
   const path = usePath()
-  const { state, error } = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+  const { state, leads, error, leadsError } = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
   if (path === '/app') {
     navigate('/app/inbox')
     return null
@@ -98,18 +107,19 @@ export function App() {
   const invoiceCount = state?.invoices.length ?? 0
   const pendingCount = state?.approvals.filter((approval) => approval.status === 'pending').length ?? 0
   const needsState = route.page !== 'policy' && route.page !== 'not-found'
-  const loading = needsState && !state && !error
+  const routeError = route.page === 'leads' ? leadsError : error
+  const loading = needsState && (!state || (route.page === 'leads' && !leads)) && !routeError && !error
   const contentToRender = route.page === 'not-found'
     ? <NotFound />
     : route.page === 'policy'
-      ? <Policy />
-      : error
+      ? <Policy state={state ?? undefined} />
+      : routeError || (needsState && error)
         ? <PageSkeleton route={route} error onRetry={() => void refreshState()} />
         : state
-        ? <RouteContent route={route} state={state} onRefresh={() => void refreshState()} />
+        ? <RouteContent route={route} state={state} leads={leads ?? []} onRefresh={() => void refreshState()} />
         : <PageSkeleton route={route} error={false} onRetry={() => void refreshState()} />
 
-  return <AppShell path={path} invoiceCount={invoiceCount} pendingCount={pendingCount}>
+  return <AppShell path={path} invoiceCount={invoiceCount} pendingCount={pendingCount} leadsCount={leads?.length ?? 0}>
     <SkeletonSwap loading={loading} skeleton={<PageSkeleton route={route} error={false} onRetry={() => void refreshState()} />}>
       {contentToRender}
     </SkeletonSwap>

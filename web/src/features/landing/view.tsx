@@ -4,6 +4,7 @@ import { Closing, Page, Opening, Section } from '../../components/ui/page'
 import { StatStrip } from '../../components/ui/stat-strip'
 import { Text } from '../../components/ui/text'
 import { content } from '../../components/ui/content.stylex'
+import { TallyLogo } from '../../components/ui/tally-logo'
 import { Link, navigate } from '../../router'
 import { styles } from './landing.stylex'
 
@@ -28,7 +29,7 @@ export function Landing() {
   return (
     <div {...stylex.props(styles.root)}>
       <nav aria-label="Site navigation" {...stylex.props(styles.nav)}>
-        <Link to="/" {...stylex.props(styles.brand)}><span aria-hidden="true" {...stylex.props(styles.dot)} />Tally</Link>
+        <Link to="/" {...stylex.props(styles.brand)}><TallyLogo size={20} />Tally</Link>
         <div {...stylex.props(styles.links)}><a href="#how" {...stylex.props(styles.navLink)}>How it works</a><a href="#policy" {...stylex.props(styles.navLink)}>Policy</a><Link to="/app/inbox" {...stylex.props(content.link)}>Open the inbox</Link></div>
       </nav>
       <div {...stylex.props(styles.content)}>

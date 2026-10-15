@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import * as stylex from '@stylexjs/stylex'
+import { HugeiconsIcon } from '@hugeicons/react'
+import { SentIcon, Tick02Icon } from '@hugeicons/core-free-icons'
 import type { AppState, ApprovalRow, ChannelMessage } from '../../api'
 import { Button } from '../../components/ui/button'
 import { InlineCitations } from '../../components/ui/inline-citations'
@@ -95,7 +97,7 @@ function ApprovalItem({ approval, busy, onDecide }: { approval: ApprovalRow; bus
         <div {...stylex.props(content.row)}><Text role="heading16">Approval needed</Text><span {...stylex.props(content.id)}>{approval.message_id.slice(0, 8)}</span></div>
         <Text role="compact">{approval.reason}</Text>
         <div {...stylex.props(content.approvalActions)}>
-          <Button variant="primary" disabled={busy} onClick={() => onDecide(approval.message_id, 'approve')}>Approve invoice</Button>
+          <Button variant="primary" disabled={busy} onClick={() => onDecide(approval.message_id, 'approve')}><span {...stylex.props(content.iconLabel)}><HugeiconsIcon icon={Tick02Icon} size={16} strokeWidth={1.5} aria-hidden="true" {...stylex.props(content.icon)} />Approve invoice</span></Button>
           <Button disabled={busy} onClick={() => onDecide(approval.message_id, 'reject')}>Reject</Button>
         </div>
       </div>
@@ -169,7 +171,7 @@ export function Inbox({ state, onRefresh }: { state: AppState; onRefresh: () => 
                 <option>Client — Northwind</option><option>Account owner</option>
               </select>
               <input aria-label="Message" value={messageText} onChange={(event) => setMessageText(event.target.value)} placeholder="Write a client message" {...stylex.props(content.input)} />
-              <Button variant="primary" type="submit" disabled={busy || !messageText.trim()}>{busy ? 'Sending' : 'Send'}</Button>
+              <Button variant="primary" type="submit" disabled={busy || !messageText.trim()}><span {...stylex.props(content.iconLabel)}><HugeiconsIcon icon={SentIcon} size={16} strokeWidth={1.5} aria-hidden="true" {...stylex.props(content.icon)} />{busy ? 'Sending' : 'Send'}</span></Button>
               {error ? <p role="alert" {...stylex.props(content.formError)}>{error}</p> : null}
             </form>
           </div>
