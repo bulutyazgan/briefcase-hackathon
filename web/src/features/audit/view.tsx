@@ -1,5 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import type { EventRow } from '../../api'
+import { formatMoneyText } from '../../format'
 import { auditEvents } from './api'
 import { styles } from './audit.stylex'
 
@@ -67,7 +68,7 @@ export function Audit({ events }: { events: EventRow[] }) {
                   </time>
                   <div>
                     <div {...stylex.props(styles.name)}>{labelFor(event.step)}</div>
-                    <p {...stylex.props(styles.summary)}>{event.summary}</p>
+                    <p {...stylex.props(styles.summary)}>{formatMoneyText(event.summary)}</p>
                     {clauses.length > 0 && (
                       <ul {...stylex.props(styles.clauseList)} aria-label="Policy clauses">
                         {clauses.map((clause) => (
