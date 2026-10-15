@@ -29,6 +29,8 @@ import { booksRoutes } from './features/books/routes'
 import { listOpportunityViews } from './features/opportunities/opportunities'
 import { companyStatus, learnCompany } from './features/company/company'
 import { seedClientMemoryToCognee } from './features/memory/memory'
+import { seedCompanyKnowledge } from './features/memory/company'
+import { listClients } from './features/ledger/store'
 
 const leadSchema = z.object({
   name: z.string(),
@@ -72,6 +74,8 @@ app.route('/api/buyer', buyerRoutes)
 app.get('/api/control', (context) => context.json(controlStatus()))
 app.route('/api/books', booksRoutes)
 app.get('/api/opportunities', (context) => context.json({ opportunities: listOpportunityViews() }))
+app.get('/api/clients', (context) => context.json({ clients: listClients() }))
+app.get('/api/clients', (context) => context.json({ clients: listClients() }))
 
 app.get('/api/leads', (context) => {
   const leads = listInvoices().flatMap((invoice) => {
@@ -172,6 +176,10 @@ if (getSetting('cognee_seed:louis') !== 'true') {
 }
 
 startAgentLoop()
+// P12: the company knowledge base reaches Cognee once per seed version; the local seed answers meanwhile.
+void seedCompanyKnowledge()
+  .then((result) => { if (result.written) console.info(`Seeded ${result.written} company facts into Cognee dataset "company".`) })
+  .catch((error: unknown) => console.warn(`Company knowledge seed failed: ${String(error)}`))
 startBuyerLoop(() => stripePayments(getStripe()))
 void startSlack().catch((error) => console.error(`Slack Socket Mode failed: ${String(error)}`))
 void startTelegram(async (messageId, action) => {
