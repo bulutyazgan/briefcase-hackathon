@@ -1,0 +1,49 @@
+{
+  "opportunities": [
+    {
+      "id": "opp-cadence-5b9c5f4f",
+      "clientName": "Northwind Capital",
+      "service": "lead-list",
+      "quantity": 200,
+      "pricePence": 80000,
+      "discountNote": "standard price list, no discount applies",
+      "icp": "fintech CFOs in London",
+      "rationale": "Northwind Capital refreshes its list every quarter and the last one was delivered 93 days ago (2026-07-14)",
+      "evidence": {
+        "kind": "cadence",
+        "facts": [
+          "Orders a fresh list of 200 leads every quarter; last list delivered 2026-07-14"
+        ],
+        "lastDelivered": "2026-07-14",
+        "daysSince": 93
+      },
+      "status": "offered",
+      "clauses": [
+        "O1",
+        "P2",
+        "P3",
+        "O2",
+        "O3"
+      ],
+      "thread": "465a5129-e931-4f02-824d-979045418857",
+      "spottedAt": "2026-10-15T20:03:23.051Z",
+      "offeredAt": "2026-10-15T20:03:23.051Z",
+      "expiresAt": "2026-10-22T20:03:23.051Z",
+      "closedAt": null,
+      "acceptanceMessageId": null,
+      "invoiceId": null,
+      "gateEvents": [
+        {
+          "clause": "O1",
+          "summary": "Spotted cadence opportunity for known client Northwind Capital (lead-list).",
+          "at": "2026-10-15T20:03:30.792Z"
+        },
+        {
+          "clause": "O2",
+          "summary": "Offer opp-cadence-5b9c5f4f for £800.00 is within the £1,000 auto-offer limit.",
+          "at": "2026-10-15T20:03:30.795Z"
+        }
+      ]
+    }
+  ]
+}

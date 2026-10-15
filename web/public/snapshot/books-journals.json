@@ -1,0 +1,37 @@
+{
+  "invoices": [
+    {
+      "invoiceId": "telegram-demo-21",
+      "reference": "in_1UQv20BcNwFEjQK2wdoPp6md",
+      "netPence": 500000,
+      "vatPence": 100000,
+      "grossPence": 600000,
+      "costPence": 0,
+      "marginPence": 500000,
+      "marginRatio": 1,
+      "paid": false
+    },
+    {
+      "invoiceId": "465a5129-e931-4f02-824d-979045418857",
+      "reference": "in_1UQuFbBcNwFEjQK2eM5u0bH6",
+      "netPence": 90000,
+      "vatPence": 18000,
+      "grossPence": 108000,
+      "costPence": 0,
+      "marginPence": 90000,
+      "marginRatio": 1,
+      "paid": false
+    },
+    {
+      "invoiceId": "3849cf2c-02bd-4b80-8e07-805504cb8498",
+      "reference": "in_1UQu2HBcNwFEjQK2VAa7lpbt",
+      "netPence": 108000,
+      "vatPence": 21600,
+      "grossPence": 129600,
+      "costPence": 0,
+      "marginPence": 108000,
+      "marginRatio": 1,
+      "paid": true
+    }
+  ]
+}

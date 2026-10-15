@@ -1,0 +1,7 @@
+node_modules/
+.env*
+!.env.example
+*.db
+dist/
+out/
+e2e/artifacts/

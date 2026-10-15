@@ -1,0 +1,12 @@
+Date,Reference,Account,Description,Debit,Credit,TaxRate
+2026-10-15,in_1UQv20BcNwFEjQK2wdoPp6md,Debtors,Lead list invoice,6000.00,,No VAT
+2026-10-15,in_1UQv20BcNwFEjQK2wdoPp6md,Sales,Lead list invoice,,5000.00,20% (VAT on Income)
+2026-10-15,in_1UQv20BcNwFEjQK2wdoPp6md,VAT output,Lead list invoice,,1000.00,No VAT
+2026-10-15,in_1UQuFbBcNwFEjQK2eM5u0bH6,Debtors,Lead list invoice,1080.00,,No VAT
+2026-10-15,in_1UQuFbBcNwFEjQK2eM5u0bH6,Sales,Lead list invoice,,900.00,20% (VAT on Income)
+2026-10-15,in_1UQuFbBcNwFEjQK2eM5u0bH6,VAT output,Lead list invoice,,180.00,No VAT
+2026-10-15,in_1UQu2HBcNwFEjQK2VAa7lpbt,Debtors,Lead list invoice,1296.00,,No VAT
+2026-10-15,in_1UQu2HBcNwFEjQK2VAa7lpbt,Sales,Lead list invoice,,1080.00,20% (VAT on Income)
+2026-10-15,in_1UQu2HBcNwFEjQK2VAa7lpbt,VAT output,Lead list invoice,,216.00,No VAT
+2026-10-15,in_1UQu2HBcNwFEjQK2VAa7lpbt,Bank,Payment received,1296.00,,No VAT
+2026-10-15,in_1UQu2HBcNwFEjQK2VAa7lpbt,Debtors,Payment received,,1296.00,No VAT
