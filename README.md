@@ -67,6 +67,7 @@ Two paths pay an open invoice in test mode.
 | `P9` | Every Treg call carries `X-Treg-Route-Max-Cost`, and each order has a sourcing cap of 60% of the invoice net. | `leads/providers/treg/` |
 | `P10` | Treg calls only to an allowlist of catalogue endpoints. | `leads/providers/treg/treg-catalog.ts` |
 | `P11` | A dispute earns a credit note for the invalid leads, capped at the number delivered, at the net price per lead. Auto-issue up to £200, above that the account owner approves. | `credit-notes/credit-notes.ts` |
+| `P12` | New clients are onboarded in conversation from the company knowledge base: an unknown sender's question is answered from the price list, and a commitment in the same thread creates the client at the standard price with no discounts. The first invoice always needs the account owner's approval. | `intake/intake.ts`, `clients/clients.ts` |
 | `O1`–`O4` | Opportunities: Tally spots revenue (quarterly cadence from memory, a need voiced in the channel, buying signals from the lead gateway) and posts an offer only to known clients for catalogue services, automatically up to £1,000 net, one open offer per client with a 7-day cooldown and never during a dispute; it bills only after an explicit acceptance in the same thread, through the normal commitment path. | `opportunities/opportunities.ts` |
 | `B1` | Buyer: gross spend this calendar month stays at or below £1,500. Over-budget offers and invoices are rejected. | `buyer/policy.ts`, `buyer/buyer.ts` |
 | `B2` | Buyer: the net price per lead on every invoice line is at most £5.00. | `buyer/policy.ts` |
@@ -147,7 +148,7 @@ cd server && TALLY_DB_PATH=:memory: bun test
 
 The 72 tests in 11 files cover books, the buyer agent, clients, collections, control, credit notes, memory, meters, pricing, and the Treg and fallback sourcers. They call no outside service. To point the Stripe SDK at a local mock, set `STRIPE_API_BASE`.
 
-Seven scripts in `server/scripts/` call the real services once the matching key is set. Run each from `server/`.
+Eight scripts in `server/scripts/` call the real services once the matching key is set. Run each from `server/`.
 
 | Script | Proves | Command |
 | --- | --- | --- |
@@ -158,6 +159,7 @@ Seven scripts in `server/scripts/` call the real services once the matching key 
 | `verify-memory.ts` | Adds one role-tagged fact to Cognee Cloud and searches it back. | `COGNEE_API_KEY=... COGNEE_BASE_URL=... bun scripts/verify-memory.ts` |
 | `verify-meters.ts` | Creates or finds the `qualified_lead` meter and sends one meter event. | `STRIPE_SECRET_KEY=sk_test_... bun scripts/verify-meters.ts` |
 | `verify-treg.ts` | One real, cheap Treg call to `apollo.people.search`. | `TREG_TOKEN=... bun scripts/verify-treg.ts` |
+| `verify-intake.ts` | Seeds the company knowledge base in Cognee, then posts the Initech inquiry and commitment to a scratch server and prints the onboarded client row and the P12 approval. | `bun scripts/verify-intake.ts` (reads `server/.env`) |
 
 What is proven against the real service so far: Treg sourcing. `bun scripts/verify-treg.ts` with the team token bought 3 leads for 2,000 micro-USD through `apollo.people.search`. Stripe billing is proven against the mock harness only, not against the Stripe test API.
 

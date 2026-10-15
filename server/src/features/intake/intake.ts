@@ -25,7 +25,10 @@ import type { BillableIntent, Decision } from '../policy/decide'
 
 // P12: a new client is onboarded from the company knowledge base at the standard
 // price list, with no discounts, and its first invoice always needs account-owner approval.
+// Step names are shared with the Notifications page (SYNC.md): company_learned, client_identified, onboard.
 export const INTAKE_STEP = 'intake'
+export const COMPANY_LEARNED_STEP = 'company_learned'
+export const CLIENT_IDENTIFIED_STEP = 'client_identified'
 export const ONBOARD_STEP = 'onboard'
 export const P12 = 'P12'
 
@@ -154,19 +157,40 @@ export async function handleIntake(message: ChannelMessage, overrides: Partial<I
   const companyName = inquiry.companyName.trim() || companyNameFromAuthor(message.author)
   const facts = await deps.recallCompany(inquiry.ask)
   const composed = composeIntakeReply(companyName, inquiry, facts)
-  recordStep(message.id, INTAKE_STEP, `Answered a new-client inquiry from ${companyName} from the company knowledge base.`, {
+  recordStep(message.id, COMPANY_LEARNED_STEP, `Answered ${companyName}'s question from the company knowledge base: ${money(STANDARD_PRICE_PER_LEAD_PENCE)} per lead, minimum ${MINIMUM_ORDER_LEADS}, 7-day terms.`, {
     companyName,
     ask: inquiry.ask,
     quantity: inquiry.quantity,
     quote: inquiry.quote,
     model: extracted.model,
     facts,
-    clarifying: composed.clarifying,
     pricePerLeadPence: STANDARD_PRICE_PER_LEAD_PENCE,
+  }, [P12])
+  recordStep(message.id, INTAKE_STEP, `Asked ${companyName} the one question needed to quote: ${composed.clarifying}`, {
+    companyName,
+    ask: inquiry.ask,
+    quantity: inquiry.quantity,
+    clarifying: composed.clarifying,
   }, [P12])
   await deps.reply(message, composed.text)
   markMessageProcessed(message.id)
   return true
+}
+
+// Records 'client_identified' the first time a thread's sender is matched to a known client.
+export function identifyClient(message: ChannelMessage, extractedName: string): Client | null {
+  const client = findClient(message.author) ?? findClient(extractedName)
+  if (!client) return null
+  const alreadyIdentified = listThreadMessages(message.thread)
+    .some((prior) => prior.id !== message.id && getEvent(prior.id, CLIENT_IDENTIFIED_STEP) !== null)
+  if (!alreadyIdentified) {
+    recordStep(message.id, CLIENT_IDENTIFIED_STEP, `Matched the sender to ${client.name} (${client.source === 'seed' ? 'seeded' : 'onboarded'} client, ${money(client.pricePerLeadPence)} per lead).`, {
+      clientName: client.name,
+      author: message.author,
+      source: client.source,
+    }, ['P5'])
+  }
+  return client
 }
 
 function threadHadIntake(message: ChannelMessage): { companyName: string; sourceMessageId: string } | null {
@@ -230,12 +254,13 @@ export function hasPriorInvoice(client: Client): boolean {
 
 // P12: an onboarded client's first invoice needs approval even when P4 would auto-send it.
 export function gateFirstInvoice(client: Client | null, decision: Decision): Decision {
-  if (!client || client.source !== 'intake' || decision.outcome !== 'auto') return decision
+  if (!client || client.source !== 'intake' || decision.outcome === 'refuse') return decision
   if (hasPriorInvoice(client)) return decision
+  const firstInvoice = `${money(decision.totalPence)} is the first invoice for new client ${client.name}; the account owner approves it.`
   return {
     ...decision,
     outcome: 'needs_approval',
     clauses: [...decision.clauses, P12],
-    reason: `${money(decision.totalPence)} is the first invoice for new client ${client.name}; the account owner approves it.`,
+    reason: decision.outcome === 'auto' ? firstInvoice : `${decision.reason} ${firstInvoice}`,
   }
 }

@@ -168,7 +168,7 @@ export function Inbox({ state, onRefresh }: { state: AppState; onRefresh: () => 
             </div>
             <form onSubmit={(event) => void submit(event)} {...stylex.props(content.composer)}>
               <select aria-label="Send as" value={author} onChange={(event) => setAuthor(event.target.value)} {...stylex.props(content.input)}>
-                <option>Client — Northwind</option><option>Account owner</option>
+                <option>Client — Northwind</option><option>Client — Initech</option><option>Account owner</option>
               </select>
               <input aria-label="Message" value={messageText} onChange={(event) => setMessageText(event.target.value)} placeholder="Write a client message" {...stylex.props(content.input)} />
               <Button variant="primary" type="submit" disabled={busy || !messageText.trim()}><span {...stylex.props(content.iconLabel)}><HugeiconsIcon icon={SentIcon} size={16} strokeWidth={1.5} aria-hidden="true" {...stylex.props(content.icon)} />{busy ? 'Sending' : 'Send'}</span></Button>
