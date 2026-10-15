@@ -7,19 +7,12 @@ This script follows the two-minute target in `PLAN.md` section 12. It runs on th
 1. In `server/.env`, set `STRIPE_SECRET_KEY` to an `rk_test_` key. An `sk_test_` key also bills, but the Guardrails panel then shows "Full secret key (sk_test_) — switch to restricted" instead of "Restricted key (rk_test_)". Until the panel is on `/app/policy`, `curl localhost:8787/api/control` shows the same key mode.
 2. Set `OPENAI_API_KEY` (or `FIREWORKS_API_KEY`), `COGNEE_API_KEY`, `COGNEE_BASE_URL`, and `TREG_TOKEN` if you have them. Without them the loop still runs on its fallbacks.
 3. If you use Treg, top up the account. Treg gives $1 of free credit once.
-4. Run the mock harness as the proof step. It needs ports 4010, 5179, and 8797 free. The rehearsal on 15 Oct 2026 on the merged base (`MOCK_PORT=4011 E2E_API_PORT=8798 E2E_WEB_PORT=5180 bun run e2e`, because 8797 was taken) gave this table:
+4. Proof steps, both run on 15 Oct 2026 against the merged base:
 
-	```
-	✗ FAIL northwind-main-story: TimeoutError: for: Timeout 15000ms exceeded.
-	✗ FAIL unknown-sender-refused: TimeoutError: for: Timeout 15000ms exceeded.
-	✗ FAIL replay-safety: TimeoutError: for: Timeout 15000ms exceeded.
-	✗ FAIL pause-blocks-billing: TimeoutError: for: Timeout 15000ms exceeded.
-	✗ FAIL acme-auto-send: TimeoutError: for: Timeout 15000ms exceeded.
-	✗ FAIL treg-sourcing: TimeoutError: for: Timeout 15000ms exceeded.
-	0 passed, 6 failed, 0 pending.
-	```
+	- **Mock harness** (`bun run e2e`, ports 4010, 5179, 8797; override with `MOCK_PORT`, `E2E_API_PORT`, `E2E_WEB_PORT` if taken): 6 passed, 0 failed after the Treg paging fix. northwind-main-story shows "Invoice created for £1,080.00 net + £216.00 VAT (20%) = £1,296.00", 300 leads ready, invoice paid, 300 meter events. Screenshots land in `e2e/artifacts/`.
+	- **Live providers** (real OpenAI, Cognee, Treg and Stripe test keys in `server/.env`): the Northwind order went extract → recall → approval → Treg bought 182 real Apollo leads → Stripe invoice `in_1UQuBX…` for £728.00 net + VAT → paid with 4242 → lead CSV delivered → 182 meter events. Each `server/scripts/verify-*.ts` script also passed live (books, meters, credit notes, buyer, memory, treg).
 
-	Every scenario fails at the same line: `page.goto(context.web)` opens `/`, which is now the landing page, and the wait for the "Client channel" heading on `/app/inbox` times out. The harness needs `context.web + '/app/inbox'` in `e2e/scenarios/*.ts` before it proves anything on this base. On the base before the landing page landed, the same run gave 5 passed and 1 failed (`northwind-main-story` showed £400.00 instead of £1,080.00). Rerun `bun run e2e` until every scenario passes. Screenshots land in `e2e/artifacts/`.
+	Apollo only held 182 fintech CFOs **in London**, so the live invoice was £728 (182 × £4, under the 200-lead discount threshold): correct policy, wrong story. For the recording, ask for **"300 fintech CFO leads in the UK"** so Apollo can fill all 300 and the 10% deal applies (£1,080.00). Extraction on gpt-5-mini takes about 15–20 s before the reply appears; keep talking through the recall beat.
 
 5. Stop the server, then reset the ledger.
 
@@ -51,7 +44,7 @@ Say: "Agencies agree work with clients in chat. Then nobody raises the invoice. 
 In the composer on `/app/inbox`, choose **Client — Northwind** and send:
 
 ```
-Let's kick off Q4. 300 fintech CFO leads in London, same deal as last time.
+Let's kick off Q4. 300 fintech CFO leads in the UK, same deal as last time.
 ```
 
 Say: "Northwind just ordered 300 leads in a chat message. Nobody on our side has touched it."
@@ -88,7 +81,7 @@ curl -s -X POST localhost:8787/api/buyer/start
 
 Watch the Inbox thread in this order:
 
-1. The procurement agent posts "PO-2026-104: Let's kick off Q4. 300 fintech CFO leads in London, same deal as last time."
+1. The procurement agent posts "PO-2026-104: Let's kick off Q4. 300 fintech CFO leads in the UK, same deal as last time."
 2. Tally prices it and asks for approval. Click **Approve invoice**.
 3. Tally finalizes the invoice, then offers an upsell: "Add 200 more leads for £800.00?"
 4. The buyer declines the upsell under B1, its monthly budget.
