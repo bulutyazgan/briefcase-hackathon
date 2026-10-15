@@ -10,6 +10,7 @@
 - `P8` Margin ≥ 40% over Treg sourcing cost, otherwise the invoice needs approval.
 - `P9` Sourcing spend caps: every Treg call carries `X-Treg-Route-Max-Cost`, and each order has a total sourcing cap. Code enforces both.
 - `P10` Treg calls only to an allowlist of catalogue endpoints (people, company, buying signals).
+- `P11` A client dispute about delivered leads earns a credit note for the leads the client says were invalid, capped at the number delivered, at the invoice's net price per lead. Auto-issue credit notes up to £200. Above that, one approval from the account owner. The dispute is remembered, so P7 stops reminders.
 
 Notes for code: the order sourcing cap (P9) is 60% of the invoice net. Sourcing cost (micro-USD) is compared with invoice amounts (pence) at a fixed rate of 1 USD = 79p.
 

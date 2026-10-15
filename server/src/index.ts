@@ -7,6 +7,12 @@ import { handleApproval, startAgentLoop } from './features/agent/agent'
 import { getApproval, getEvent, getInvoice, getState } from './features/ledger/store'
 import { leadsCsv } from './features/leads/leads'
 import { controlStatus } from './features/control/control'
+import { invoiceLeadRows } from './features/meters/meters'
+import { buyerRoutes } from './features/buyer/routes'
+import { startBuyerLoop } from './features/buyer/buyer'
+import { stripePayments } from './features/buyer/providers/stripe-payments'
+import { getStripe } from './features/billing/billing'
+import { booksRoutes } from './features/books/routes'
 
 const leadsSchema = z.array(z.object({
   name: z.string(),
@@ -19,7 +25,9 @@ const app = new Hono()
 app.get('/health', (context) => context.json({ status: 'ok' }))
 app.get('/api/state', (context) => context.json(getState()))
 app.route('/api/channels', channelRoutes)
+app.route('/api/buyer', buyerRoutes)
 app.get('/api/control', (context) => context.json(controlStatus()))
+app.route('/api/books', booksRoutes)
 
 app.post('/api/approvals/:id', async (context) => {
   const messageId = context.req.param('id')
@@ -49,6 +57,12 @@ app.get('/api/leads/:invoiceId.csv', (context) => {
   })
 })
 
+app.get('/api/invoices/:id/leads', (context) => {
+  const rows = invoiceLeadRows(context.req.param('id'))
+  if (!rows) return context.json({ error: 'Invoice not found.' }, 404)
+  return context.json({ leads: rows })
+})
+
 app.get('/api/invoices/:id/pdf', async (context) => {
   const invoice = getInvoice(context.req.param('id'))
   if (!invoice?.pdf_path || !(await Bun.file(invoice.pdf_path).exists())) {
@@ -61,6 +75,7 @@ app.get('/api/invoices/:id/pdf', async (context) => {
 })
 
 startAgentLoop()
+startBuyerLoop(() => stripePayments(getStripe()))
 void startSlack().catch((error) => console.error(`Slack Socket Mode failed: ${String(error)}`))
 
 const port = Number(process.env.PORT ?? 8787)

@@ -1,11 +1,13 @@
 import Stripe from 'stripe'
 import type { BillableIntent, Decision } from '../policy/decide'
 import { findClient } from '../clients/clients'
-import { listInvoices, saveInvoice } from '../ledger/store'
+import { getMessage, listInvoices, saveInvoice } from '../ledger/store'
+import { extractPoNumber } from '../buyer/policy'
+import { ensureVatTaxRate } from '../books/vat-rate'
 
 export class BillingBlockedError extends Error {}
 
-function getStripe(): Stripe {
+export function getStripe(): Stripe {
   const secretKey = process.env.STRIPE_SECRET_KEY
   if (!secretKey?.startsWith('sk_test_') && !secretKey?.startsWith('rk_test_')) {
     throw new BillingBlockedError('Stripe billing requires a key that starts with sk_test_ or rk_test_.')
@@ -47,11 +49,23 @@ export async function createInvoice(
     name: client.name,
     email,
   }, { idempotencyKey: `customer-${messageId}` })
+  const vatTaxRateId = await ensureVatTaxRate(stripe)
 
+  // Draft first, items attached to it: since API 2022-08-01 pending items are not pulled into new invoices.
+  const poNumber = extractPoNumber(getMessage(messageId)?.text ?? intent.ask)
+  const invoice = await stripe.invoices.create({
+    customer: customer.id,
+    collection_method: 'send_invoice',
+    days_until_due: 7,
+    metadata: { message_id: messageId, decision_clauses: decision.clauses.join(','), ...(poNumber ? { po_number: poNumber } : {}) },
+    ...(poNumber ? { description: `Purchase order ${poNumber}` } : {}),
+  }, { idempotencyKey: `invoice-${messageId}` })
   await Promise.all(decision.lines.map((line, index) => stripe.invoiceItems.create({
     customer: customer.id,
+    invoice: invoice.id,
     amount: line.totalPence,
     currency: 'gbp',
+    tax_rates: [vatTaxRateId],
     description: `${line.description}: ${line.quantity} at ${money(line.unitPricePence)} per lead${
       line.quantity * line.unitPricePence > line.totalPence
         ? `; agreed discount ${money(line.quantity * line.unitPricePence - line.totalPence)}`
@@ -59,12 +73,6 @@ export async function createInvoice(
     }`,
   }, { idempotencyKey: `invoice-item-${messageId}-${index}` })))
 
-  const invoice = await stripe.invoices.create({
-    customer: customer.id,
-    collection_method: 'send_invoice',
-    days_until_due: 7,
-    metadata: { message_id: messageId, decision_clauses: decision.clauses.join(',') },
-  }, { idempotencyKey: `invoice-${messageId}` })
   const finalized = await stripe.invoices.finalizeInvoice(invoice.id, {}, {
     idempotencyKey: `finalize-${messageId}`,
   })

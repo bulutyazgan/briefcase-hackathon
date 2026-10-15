@@ -15,6 +15,8 @@ import {
   type ChannelMessage,
 } from '../ledger/store'
 import { createInvoice, BillingBlockedError, readStripeInvoiceStatus } from '../billing/billing'
+import { vatBreakdownText } from '../books/books'
+import { syncBooks } from '../books/sync'
 import { reply } from '../channels/channel'
 import { canonicalClientName, recallFacts, recallSeededFacts, rememberFact } from '../memory/memory'
 import { leadsCsv, type Lead } from '../leads/leads'
@@ -30,6 +32,9 @@ import { sourcingCapMicro } from '../pricing/pricing'
 import { renderInvoicePdf } from '../invoice-pdf/render'
 import { blockIfPaused, handleControlCommand } from '../control/control'
 import { runCollectionsTick } from '../collections/collections'
+import { meterQualifiedLeads, recordLeadQualification } from '../meters/meters'
+import { handleCreditNoteApproval, handleDispute } from '../credit-notes/credit-notes'
+import { offerUpsellToAgentBuyer } from '../buyer/upsell'
 
 const intentSchema = z.object({
   isCommitment: z.boolean(),
@@ -171,7 +176,7 @@ async function explainLatestInvoice(message: ChannelMessage): Promise<boolean> {
     `Quote: “${line.quote}”\nMemory: ${line.memoryFact}\nPolicy: ${line.clauses.join(', ')}`,
   ).join('\n') ?? 'The evidence details are not available.'
   const text = [
-    `This invoice is £${(invoice.total_pence / 100).toFixed(2)} because the client agreed to the work.`,
+    `This invoice is ${vatBreakdownText(invoice.total_pence)} because the client agreed to the work.`,
     explanation,
     `Policy clauses: ${saved?.decision.clauses.join(', ') ?? 'not recorded'}.`,
     `Stripe invoice: ${invoice.stripe_invoice_id ?? 'not created'}.`,
@@ -199,6 +204,9 @@ async function continueBilling(message: ChannelMessage, saved: SavedDecision): P
       totalPence: decision.totalPence,
       idempotencyKey: message.id,
     }, decision.clauses)
+    // Metering is audit, not the money path: never hold the invoice reply on hundreds of meter calls.
+    void meterQualifiedLeads(message.id)
+    syncBooks()
 
     let pdfPath: string | null = null
     try {
@@ -215,11 +223,11 @@ async function continueBilling(message: ChannelMessage, saved: SavedDecision): P
 
     try {
       await rememberFact(intent.clientName, `${new Date().toISOString().slice(0, 10)}: invoiced ${intent.ask}`)
-      recordStep(message.id, 'remember', 'Saved the client commitment to Cognee memory.', {
+      recordStep(message.id, 'remember', 'Saved the client commitment to client memory.', {
         clientName: intent.clientName,
       })
     } catch (error) {
-      recordStep(message.id, 'remember', 'Cognee memory write failed.', { error: String(error) })
+      recordStep(message.id, 'remember', 'Client memory write failed.', { error: String(error) })
     }
 
     const pdfUrl = pdfPath ? `/api/invoices/${message.id}/pdf` : 'PDF unavailable'
@@ -228,7 +236,7 @@ async function continueBilling(message: ChannelMessage, saved: SavedDecision): P
       ? `We found ${leads.length} of the ${intent.quantity} leads requested. The invoice covers only the ${leads.length} delivered.`
       : `${leads.length} leads are ready.`
     await reply(message, [
-      `Invoice created for £${(decision.totalPence / 100).toFixed(2)}.`,
+      `Invoice created for ${vatBreakdownText(decision.totalPence)}.`,
       result.hostedUrl,
       `Invoice PDF: ${pdfUrl}`,
       `Lead list: ${leadUrl}`,
@@ -239,6 +247,7 @@ async function continueBilling(message: ChannelMessage, saved: SavedDecision): P
       pdfUrl,
       leadUrl,
     }, decision.clauses)
+    await offerUpsellToAgentBuyer(message, intent.clientName)
   } catch (error) {
     if (error instanceof BillingBlockedError) {
       recordStep(message.id, 'billing_blocked', error.message, {
@@ -285,6 +294,7 @@ async function sourceAndBill(message: ChannelMessage, priced: SavedDecision): Pr
 
   const settled = settleOrder(intent, facts, discountTerms, requestedQuantity, sourcing)
   const leads: Lead[] = settled.leads.map(({ name, company, url }) => ({ name, company, url }))
+  recordLeadQualification(message.id, settled.leads)
   recordStep(message.id, 'size', `Sourced ${leads.length} of ${requestedQuantity} leads.`, {
     requested: requestedQuantity,
     found: leads.length,
@@ -319,6 +329,7 @@ async function processMessage(message: ChannelMessage): Promise<void> {
   if (await handleControlCommand(message)) return
   try {
     if (/\bwhy\b/i.test(message.text) && await explainLatestInvoice(message)) return
+    if (await handleDispute(message)) return
     const extracted = await extractIntent(message)
     const intent = extracted.intent
     // P5: the sender identifies the client; the extracted name is only a fallback.
@@ -346,7 +357,7 @@ async function processMessage(message: ChannelMessage): Promise<void> {
     try {
       facts = await recallFacts(intent.clientName, intent.ask)
     } catch (error) {
-      recordStep(message.id, 'recall', 'Cognee recall failed; using the seeded memory facts.', { error: String(error) })
+      recordStep(message.id, 'recall', 'Live memory recall failed; using the seeded memory facts.', { error: String(error) })
       facts = await recallSeededFacts(intent.clientName)
     }
     recordStep(message.id, 'recall', `Recalled ${facts.length} client memory facts.`, { facts })
@@ -411,6 +422,7 @@ async function processApprovedMessage(messageId: string): Promise<void> {
 }
 
 export async function handleApproval(messageId: string, action: 'approve' | 'reject'): Promise<void> {
+  if (await handleCreditNoteApproval(messageId, action)) return
   const message = getMessage(messageId)
   if (!message) return
   updateApproval(messageId, action === 'approve' ? 'approved' : 'rejected')
@@ -470,6 +482,7 @@ async function pollInvoices(): Promise<void> {
         stripeInvoiceId: invoice.stripe_invoice_id,
         csvRows: savedLeads?.success ? savedLeads.data.length : 0,
       }, ['P2', 'P6'])
+      syncBooks()
     } catch (error) {
       if (error instanceof BillingBlockedError) return
       console.warn(`Invoice status poll failed for ${invoice.id}: ${String(error)}`)

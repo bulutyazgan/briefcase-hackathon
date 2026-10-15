@@ -94,6 +94,7 @@ Lives in `server/policy/billing-policy.md` (human-readable, shown in the UI) and
 - `P8` Margin ≥ 40% over Treg sourcing cost, otherwise the invoice needs approval.
 - `P9` Sourcing spend caps: every Treg call carries `X-Treg-Route-Max-Cost`, and each order has a total sourcing cap. Code enforces both.
 - `P10` Treg calls only to an allowlist of catalogue endpoints (people, company, buying signals).
+- `P11` Disputed leads earn a Stripe credit note for the claimed invalid leads (capped at the delivered count) at the invoice's net price per lead. Auto-issue up to £200. Above that, one approval from the account owner.
 
 ## 6. Stack
 
