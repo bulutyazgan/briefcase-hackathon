@@ -1,4 +1,5 @@
-import { generateObject } from 'ai'
+import { generateText, Output, type LanguageModel } from 'ai'
+import { createOpenAI } from '@ai-sdk/openai'
 import { createFireworks } from '@ai-sdk/fireworks'
 import { z } from 'zod'
 import {
@@ -136,9 +137,6 @@ function heuristicIntent(message: ChannelMessage): BillableIntent {
 }
 
 async function extractIntent(message: ChannelMessage): Promise<{ intent: BillableIntent; model: string }> {
-  const apiKey = process.env.FIREWORKS_API_KEY
-  if (!apiKey) return { intent: heuristicIntent(message), model: 'local-fallback' }
-  const fireworks = createFireworks({ apiKey })
   const prompt = [
     'Extract a billable client commitment from this message.',
     'The quote must be an exact substring. Do not invent any details.',
@@ -146,19 +144,29 @@ async function extractIntent(message: ChannelMessage): Promise<{ intent: Billabl
     `Message author: ${message.author}`,
     `Message: ${message.text}`,
   ].join('\n')
-  const models = [
-    'accounts/fireworks/models/deepseek-v4p1-flash',
-    'accounts/fireworks/models/glm-5p3-flash',
-  ]
-  for (const modelId of models) {
-    try {
-      const result = await generateObject({ model: fireworks(modelId), schema: intentSchema, prompt })
-      return { intent: result.object, model: modelId }
-    } catch (error) {
-      console.warn(`Fireworks extraction failed for ${modelId}: ${String(error)}`)
+  // OpenAI first (Louis's call), Fireworks second, deterministic heuristics when no key is configured.
+  const openaiKey = process.env.OPENAI_API_KEY
+  const fireworksKey = process.env.FIREWORKS_API_KEY
+  const candidates: Array<{ id: string; model: LanguageModel }> = []
+  if (openaiKey) {
+    const modelId = process.env.OPENAI_MODEL?.trim() || 'gpt-5-mini'
+    candidates.push({ id: modelId, model: createOpenAI({ apiKey: openaiKey })(modelId) })
+  }
+  if (fireworksKey) {
+    const fireworks = createFireworks({ apiKey: fireworksKey })
+    for (const modelId of ['accounts/fireworks/models/deepseek-v4p1-flash', 'accounts/fireworks/models/glm-5p3-flash']) {
+      candidates.push({ id: modelId, model: fireworks(modelId) })
     }
   }
-  return { intent: heuristicIntent(message), model: 'local-fallback-after-model-error' }
+  for (const candidate of candidates) {
+    try {
+      const { output } = await generateText({ model: candidate.model, output: Output.object({ schema: intentSchema }), prompt })
+      return { intent: output, model: candidate.id }
+    } catch (error) {
+      console.warn(`Extraction failed for ${candidate.id}: ${String(error)}`)
+    }
+  }
+  return { intent: heuristicIntent(message), model: candidates.length ? 'local-fallback-after-model-error' : 'local-fallback' }
 }
 
 function findSavedDecision(messageId: string): SavedDecision | null {
@@ -210,10 +218,16 @@ async function continueBilling(message: ChannelMessage, saved: SavedDecision): P
 
     let pdfPath: string | null = null
     try {
+      const client = findClient(intent.clientName)
       pdfPath = await renderInvoicePdf({
         invoiceId: message.id,
+        issuedAt: new Date(),
+        dueInDays: 7,
+        client: { name: client?.name ?? intent.clientName, email: client?.billingEmail ?? '' },
         totalPence: decision.totalPence,
         lines: decision.lines,
+        paymentUrl: result.hostedUrl ?? undefined,
+        stripeInvoiceId: result.stripeInvoiceId ?? undefined,
       })
       updateInvoice(message.id, 'open', undefined, pdfPath)
       recordStep(message.id, 'render', 'Rendered the invoice and evidence appendix.', { pdfPath }, decision.clauses)
@@ -331,6 +345,15 @@ async function processMessage(message: ChannelMessage): Promise<void> {
     if (/\bwhy\b/i.test(message.text) && await explainLatestInvoice(message)) return
     if (await handleDispute(message)) return
     const extracted = await extractIntent(message)
+    if (!extracted) {
+      const reason = 'OPENAI_API_KEY is not configured; extraction is blocked.'
+      recordStep(message.id, 'extract_blocked', reason, {
+        model: process.env.OPENAI_MODEL?.trim() || 'gpt-5-mini',
+      }, ['P1'])
+      await reply(message, `Extraction blocked: ${reason}`)
+      markMessageProcessed(message.id)
+      return
+    }
     const intent = extracted.intent
     // P5: the sender identifies the client; the extracted name is only a fallback.
     const knownClient = findClient(message.author) ?? findClient(await canonicalClientName(intent.clientName))

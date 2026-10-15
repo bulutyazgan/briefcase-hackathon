@@ -1,18 +1,17 @@
 # Coverage gaps
 
-Explicit record of decisions this skill does NOT yet govern. Reviews that hit these record the gap here instead of improvising a rule.
+Record design questions that the other references do not resolve. Use checked
+evidence rather than filling a gap with an assumption.
 
 | Gap | Surface | Evidence needed |
-|---|---|---|
-| No exemplars yet — first shipped PR with a documented decision | any | merged PR + review comment |
-| Destructive-action inventory (what exists today, per surface) | tasks, setup, registry | rendered audit of every destructive CTA |
-| Registry object vocabulary unconfirmed (Property, Tenant, Landlord, Contractor, Lead, Work order) | registry | human pass over `glossary.md` |
-| Empty-state inventory across the registry's six list views | registry | rendered audit |
-| Form validation copy patterns | setup dialogs, onboarding | shipped forms review |
-| Mobile layout for the tasks board (horizontal scroll vs. stacked columns) | tasks | rendered audit at 390px |
+| --- | --- | --- |
+| Empty and sparse states | Any data-backed surface | Rendered review with no data and a small data set |
+| Responsive behavior | Inbox, invoices, and audit | Rendered review at narrow and wide widths |
+| Evidence presentation | Invoice detail | Review of the quote, memory fact, and policy evidence together |
+| Approval feedback | Approval card | Review of pending, approved, rejected, and error states |
 
 ## Closing a gap
 
-1. Collect evidence (shipped PR, rendered audit, review thread).
-2. Write the decision in the surface file or `rules.md` with status `proposed`.
-3. Human accepts → status flips to `accepted`, gap row removed.
+1. Collect evidence from the running surface, behavior, or user decision.
+2. Add the rule to the narrowest reference that owns it.
+3. Remove the gap after the decision is clear and its scope is recorded.

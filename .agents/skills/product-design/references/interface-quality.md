@@ -1,35 +1,36 @@
 # Interface quality
 
-Load for: implementation work, material visual changes and full reviews.
+Load for implementation work, material visual changes, and full reviews.
 
 ## Hierarchy
 
-- Establish hierarchy with type, spacing and alignment before adding containers.
-- Give each view one primary action.
-- Use the color roles in `DESIGN.md` §Color.
+- Establish hierarchy with type, spacing, and alignment before adding
+  containers.
+- Give each view one clear primary action.
+- Keep the current task and the relevant evidence visible.
 
-## Tokens
+## Tokens and components
 
-Follow `DESIGN.md` §Enforcement for token use. Use `stylex-authoring` for StyleX syntax and file conventions.
+- Use StyleX tokens from `web/src/tokens/tokens.stylex.ts`.
+- Follow the token and component patterns in the feature being changed.
+- Keep feature-specific components in `web/src/features/<name>/`.
+- Do not add a second design-token source or a UI framework.
 
-## Surfaces and elevation
+## Surfaces and type
 
-Follow `DESIGN.md` §Surfaces and elevation. Use borders for in-flow separation. Reserve shadows for floating UI.
+- Use borders for in-flow separation. Reserve shadows for floating content.
+- Use readable type sizes and line lengths.
+- Keep labels and body copy clear at the displayed size.
 
-## Type and copy
+## Layout and responsive behavior
 
-Follow `DESIGN.md` §Typography and §Labels and copy. Use `copy.md` for the copy workflow.
+- Check narrow and wide viewports, long strings, and large values for overflow.
+- Give touch controls usable targets at compact widths.
+- Provide a non-hover path for actions that appear on hover.
+- Put hover motion behind a suitable hover-capability media query.
 
-## Layout and responsive
+## Review
 
-Use the layout and breakpoint accessors. Follow `DESIGN.md` §Layout and breakpoints. Check narrow and wide viewports. Check long strings and large values for overflow.
-
-- Give touch controls a usable target at compact widths.
-- Give hover-only actions a non-hover path.
-- Put hover motion behind `@media (hover: hover) and (pointer: fine)`.
-
-## Components
-
-Reach for `@/ui/*` first. The components in `apps/web/src/components/ui/` own their visual API. Add a component variant when a need is missing. Do not bypass the API at a call site.
-
-Follow `DESIGN.md` §Buttons and controls for the Liquefy boundary.
+- Check focus order, keyboard use, contrast, and accessible names.
+- Compare the rendered interface with the source tokens and current feature
+  patterns.

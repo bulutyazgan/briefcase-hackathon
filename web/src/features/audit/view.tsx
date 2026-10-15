@@ -17,7 +17,7 @@ export function Audit({ events }: { events: EventRow[] }) {
             {recentEvents.map((event) => (
               <article key={event.id} {...stylex.props(styles.event)}>
                 <time dateTime={event.created_at} {...stylex.props(styles.time)}>
-                  {new Date(event.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  {new Date(event.created_at).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })}
                 </time>
                 <div>
                   <div {...stylex.props(styles.name)}>{event.step.replaceAll('_', ' ')}</div>

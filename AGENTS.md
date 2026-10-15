@@ -17,7 +17,3 @@
 - Never commit secrets. Use Stripe test keys only.
 - Comments are allowed when they add useful context. There are no static-analysis
   gates for this prototype.
-- cf0-specific paths in copied skills map as follows:
-  `apps/web` → `web`; `DESIGN.md` → `web/src/tokens/tokens.stylex.ts`;
-  `./c check` → `bun run typecheck`; D1 → `bun:sqlite` in
-  `server/src/features/ledger`; `@/ui` → local feature components.

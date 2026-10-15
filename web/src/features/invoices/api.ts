@@ -1,13 +1,25 @@
 import type { EventRow } from '../../api'
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
+export async function simulateInvoicePayment(invoiceId: string): Promise<void> {
+  const response = await fetch(`/api/invoices/${encodeURIComponent(invoiceId)}/simulate-payment`, {
+    method: 'POST',
+  })
+  if (response.ok) return
+  const payload: unknown = await response.json()
+  const message = isRecord(payload) && typeof payload.error === 'string'
+    ? payload.error
+    : `Test payment failed (${response.status}).`
+  throw new Error(message)
+}
+
 export interface InvoiceEvidence {
   quote: string
   memoryFact: string
   clauses: string[]
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
 
 export function evidenceFromEvent(event: EventRow | undefined): InvoiceEvidence[] {
