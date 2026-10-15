@@ -17,9 +17,18 @@ export type DataTableColumn<T> = {
   width?: string
 }
 
+type RowProps = ReturnType<typeof stylex.props>
+
+// The row's own styles (hover, transition) and a caller's entrance animation touch different properties, so the class lists simply concatenate.
+function mergeRowProps(base: RowProps, extra: RowProps | undefined): RowProps {
+  if (!extra) return base
+  const className = [base.className, extra.className].filter(Boolean).join(' ')
+  return { className: className || undefined, style: base.style || extra.style ? { ...base.style, ...extra.style } : undefined }
+}
+
 export function DataTable<T>({
   rows, columns, rowKey, loading = false, searchPlaceholder = 'Search records',
-  toolbar, emptyTitle, emptyBody, pageSize = 10, onRowClick,
+  toolbar, emptyTitle, emptyBody, pageSize = 10, onRowClick, rowProps,
 }: {
   rows: T[]
   columns: DataTableColumn<T>[]
@@ -31,6 +40,8 @@ export function DataTable<T>({
   emptyBody?: string
   pageSize?: number
   onRowClick?: (row: T) => void
+  // Extra props per row from stylex.props, e.g. an entrance for rows seen for the first time.
+  rowProps?: (row: T) => RowProps
 }) {
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null)
@@ -68,7 +79,7 @@ export function DataTable<T>({
       <thead><tr>{columns.map((column) => <th key={column.key} scope="col" aria-sort={sort?.key === column.key ? sort.direction === 'asc' ? 'ascending' : 'descending' : column.sortValue ? 'none' : undefined} {...stylex.props(styles.heading, column.align === 'end' && styles.alignEnd)}>
         {column.sortValue ? <button type="button" onClick={() => cycleSort(column.key)} {...stylex.props(styles.sortButton)}>{column.label}{sort?.key === column.key ? <HugeiconsIcon icon={sort.direction === 'asc' ? ArrowUp01Icon : ArrowDown01Icon} size={14} strokeWidth={1.5} aria-hidden="true" /> : null}</button> : column.label}
       </th>)}</tr></thead>
-      <tbody key={currentPage} {...stylex.props(styles.pageFade)}>{loading ? Array.from({ length: 6 }, (_, index) => <tr key={index}>{columns.map((column) => <td key={column.key} {...stylex.props(styles.cell)}><span {...stylex.props(styles.skeleton)} /></td>)}</tr>) : pageRows.map((row) => <tr key={rowKey(row)} tabIndex={onRowClick ? 0 : undefined} onClick={onRowClick ? () => onRowClick(row) : undefined} onKeyDown={onRowClick ? (event) => { if (event.key === 'Enter') onRowClick(row) } : undefined} {...stylex.props(styles.row, onRowClick && styles.clickable)}>{columns.map((column) => <td key={column.key} {...stylex.props(styles.cell, column.mono && styles.mono, column.align === 'end' && styles.alignEnd)}>{column.render(row)}</td>)}</tr>)}</tbody>
+      <tbody key={currentPage} {...stylex.props(styles.pageFade)}>{loading ? Array.from({ length: 6 }, (_, index) => <tr key={index}>{columns.map((column) => <td key={column.key} {...stylex.props(styles.cell)}><span {...stylex.props(styles.skeleton)} /></td>)}</tr>) : pageRows.map((row) => <tr key={rowKey(row)} tabIndex={onRowClick ? 0 : undefined} onClick={onRowClick ? () => onRowClick(row) : undefined} onKeyDown={onRowClick ? (event) => { if (event.key === 'Enter') onRowClick(row) } : undefined} {...mergeRowProps(stylex.props(styles.row, onRowClick && styles.clickable), rowProps?.(row))}>{columns.map((column) => <td key={column.key} {...stylex.props(styles.cell, column.mono && styles.mono, column.align === 'end' && styles.alignEnd)}>{column.render(row)}</td>)}</tr>)}</tbody>
     </table></div>}
     {filtered.length > 0 && !loading ? <footer {...stylex.props(styles.footer)}><Text role="compact">{(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, filtered.length)} of {filtered.length}</Text><div {...stylex.props(styles.pager)}>
       <button type="button" aria-label="Previous page" disabled={currentPage <= 1} onClick={() => setPage(Math.max(1, currentPage - 1))} {...stylex.props(styles.pageButton)}><HugeiconsIcon icon={ArrowLeft01Icon} size={16} strokeWidth={1.5} aria-hidden="true" /></button>

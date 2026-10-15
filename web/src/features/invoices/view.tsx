@@ -10,11 +10,19 @@ import type { DataTableColumn } from '../../components/ui/data-table'
 import { StatStrip } from '../../components/ui/stat-strip'
 import { Text } from '../../components/ui/text'
 import { content } from '../../components/ui/content.stylex'
+import { motion } from '../../motion.stylex'
+import { useValueChanged } from '../../motion'
 import { Link, navigate } from '../../router'
 import { evidenceFromEvent, simulateInvoicePayment } from './api'
 
 function money(pence: number): string {
   return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(pence / 100)
+}
+
+// Cross-fades its colour when the status changes and pulses once, so "paid" is seen to happen.
+function StatusPill({ invoice }: { invoice: InvoiceRow }) {
+  const changed = useValueChanged(`invoice-status:${invoice.id}`, invoice.status)
+  return <span {...stylex.props(content.status, motion.tinted, changed && motion.pulse)}>{invoice.status === 'paid' ? 'Paid' : 'Open'}</span>
 }
 
 function clientName(state: AppState, invoice: InvoiceRow): string {
@@ -65,7 +73,7 @@ export function Invoices({ state }: { state: AppState }) {
     { key: 'client', label: 'Client', render: (invoice) => clientName(state, invoice), sortValue: (invoice) => clientName(state, invoice), searchValue: (invoice) => clientName(state, invoice) },
     { key: 'leads', label: 'Leads', align: 'end', render: (invoice) => leadCount(state, invoice), sortValue: (invoice) => leadCount(state, invoice) },
     { key: 'total', label: 'Total', align: 'end', mono: true, render: (invoice) => money(invoice.total_pence), sortValue: (invoice) => invoice.total_pence },
-    { key: 'status', label: 'Status', render: (invoice) => invoice.status, sortValue: (invoice) => invoice.status },
+    { key: 'status', label: 'Status', render: (invoice) => <StatusPill invoice={invoice} />, sortValue: (invoice) => invoice.status },
     { key: 'issued', label: 'Issued', mono: true, render: (invoice) => new Date(invoice.created_at).toLocaleDateString('en-GB'), sortValue: (invoice) => invoice.created_at },
   ]
   return (
@@ -125,7 +133,7 @@ export function InvoiceDetail({ state, invoiceId, onRefresh }: { state: AppState
       {paymentError ? <p role="alert" {...stylex.props(content.error)}>{paymentError}</p> : null}
       <div id="invoice-amount"><StatStrip items={[
         { label: 'Amount', value: money(invoice.total_pence), mono: true },
-        { label: 'Status', value: paid ? 'Paid' : 'Open' },
+        { label: 'Status', value: <StatusPill invoice={invoice} /> },
         { label: 'Client', value: client },
         { label: 'Stripe invoice', value: invoice.stripe_invoice_id || 'Not created', mono: true },
       ]} /></div>

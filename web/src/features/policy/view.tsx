@@ -3,6 +3,7 @@ import { DataTable } from '../../components/ui/data-table'
 import type { DataTableColumn } from '../../components/ui/data-table'
 import { Page, Opening, Section } from '../../components/ui/page'
 import { StatStrip } from '../../components/ui/stat-strip'
+import { Control } from '../control/view'
 
 const clauses = [
   { id: 'P1', rule: 'Bill only from a client message that contains an explicit commitment (“let’s do”, “go ahead”, “order”, a quantity).', value: 'Explicit client quote', enforcedBy: 'extractIntent()' },
@@ -33,6 +34,7 @@ export function Policy({ state }: { state?: AppState }) {
       <Section title="Billing policy" description="Each decision cites the clause it uses">
         <DataTable rows={clauses} columns={columns} rowKey={(clause) => clause.id} emptyTitle="No policy clauses" />
       </Section>
+      <Control />
     </Page>
   )
 }
