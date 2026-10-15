@@ -15,6 +15,7 @@ export const replaySafety: Scenario = {
     await sendFromSimulator(page, NORTHWIND_ASK)
     const approvalCard = page.getByRole('region', { name: 'Invoice approval' })
     await approvalCard.waitFor({ timeout: 30000 })
+    const approvedAt = new Date().toISOString()
     await approvalCard.getByRole('button', { name: 'Approve invoice' }).click()
     const invoicesPanel = page.getByRole('region', { name: 'Invoices' })
     await invoicesPanel.getByRole('button', { name: /in_mock_/ }).first().waitFor({ timeout: 30000 })
@@ -33,15 +34,23 @@ export const replaySafety: Scenario = {
     })
     assert(again.status === 409, `a second approval must be refused with 409, got ${again.status}`)
 
-    // Replay the message.
-    const eventsBefore = first.events.filter((event) => event.message_id === messageId).length
+    // Replay only once the approval pass has finished: the invoice shows before that pass marks the
+    // message processed again, and a reset made before that mark is overwritten by it.
+    await waitFor('the approval pass to mark the message processed', async () => {
+      const state = await ledger(api)
+      const row = state.messages.find((entry) => entry.id === messageId)
+      return row !== undefined && row.processed_at !== null && row.processed_at > approvedAt
+    }, 60000)
     const database = new Database(context.dbPath)
+    database.exec('PRAGMA busy_timeout = 15000')
+    const resetAt = new Date().toISOString()
     database.query('UPDATE messages SET processed_at = NULL WHERE id = ?').run(messageId)
     database.close()
+    // A fresh processed_at proves the second pass ran; the event list is capped, so its length cannot.
     await waitFor('the replayed message to be processed again', async () => {
       const state = await ledger(api)
-      const reprocessed = state.events.filter((event) => event.message_id === messageId).length > eventsBefore
-      return reprocessed && state.messages.find((entry) => entry.id === messageId && entry.processed_at !== null)
+      const row = state.messages.find((entry) => entry.id === messageId)
+      return row !== undefined && row.processed_at !== null && row.processed_at > resetAt
     })
     await context.shot('replayed')
 

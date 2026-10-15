@@ -74,6 +74,7 @@ describe('tregSourcer', () => {
     expect(call?.url.startsWith('http://mock/call/apollo.people.search?')).toBe(true)
     expect(call?.url).toContain('person_titles%5B%5D=head+of+marketing')
     expect(call?.url).toContain('per_page=5')
+    expect(call?.url).toContain('page=1')
   })
 
   test('reads cost from X-Treg-Cost-Micro and splits it across leads', async () => {
@@ -134,6 +135,54 @@ describe('tregSourcer', () => {
     const result = await source(request)
     expect(result.leads).toHaveLength(0)
     expect(result.calls[0]).toMatchObject({ accepted: false, clauses: ['P9'], costMicro: 0 })
+  })
+
+  test('pages through people search until the quantity is collected', async () => {
+    const { fetchImpl, seen } = fakeFetch((url) => {
+      const page = Number(new URL(url).searchParams.get('page'))
+      return { body: people(100, (page - 1) * 100), cost: 0 }
+    })
+    const source = createTregSourcer({
+      token: 't', baseUrl: 'http://mock', fetch: fetchImpl,
+      propose: proposer([{ endpointId: 'apollo.people.search', params: {} }]),
+    })
+    const result = await source({ ...request, quantity: 300 })
+    expect(seen.map((call) => new URL(call.url).searchParams.get('page'))).toEqual(['1', '2', '3'])
+    expect(seen.every((call) => call.url.includes('per_page=100'))).toBe(true)
+    expect(result.leads).toHaveLength(300)
+    expect(new Set(result.leads.map((lead) => lead.id)).size).toBe(300)
+    expect(result.calls.map((call) => [call.page, call.accepted])).toEqual([[1, true], [2, true], [3, true]])
+  })
+
+  test('stops paging when the next page would exceed the order cap (P9)', async () => {
+    const { fetchImpl, seen } = fakeFetch((url) => {
+      const page = Number(new URL(url).searchParams.get('page'))
+      return { body: people(100, (page - 1) * 100), cost: 10_000 }
+    })
+    const source = createTregSourcer({
+      token: 't', baseUrl: 'http://mock', fetch: fetchImpl,
+      propose: proposer([{ endpointId: 'apollo.people.search', params: {} }]),
+    })
+    const result = await source({ ...request, quantity: 300, maxTotalCostMicro: 25_000 })
+    expect(seen).toHaveLength(2)
+    expect(result.leads).toHaveLength(200)
+    expect(result.costMicro).toBe(20_000)
+    expect(result.calls[2]).toMatchObject({ page: 3, accepted: false, clauses: ['P9'], costMicro: 0 })
+  })
+
+  test('stops paging on a short page', async () => {
+    const { fetchImpl, seen } = fakeFetch((url) => {
+      const page = Number(new URL(url).searchParams.get('page'))
+      return { body: people(page === 1 ? 100 : 40, (page - 1) * 100), cost: 0 }
+    })
+    const source = createTregSourcer({
+      token: 't', baseUrl: 'http://mock', fetch: fetchImpl,
+      propose: proposer([{ endpointId: 'apollo.people.search', params: {} }]),
+    })
+    const result = await source({ ...request, quantity: 300 })
+    expect(seen).toHaveLength(2)
+    expect(result.leads).toHaveLength(140)
+    expect(result.calls.map((call) => call.page)).toEqual([1, 2])
   })
 
   test('throws TregUnavailableError when TREG_TOKEN is missing', async () => {

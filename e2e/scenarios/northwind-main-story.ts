@@ -56,10 +56,12 @@ export const northwindMainStory: Scenario = {
 
     const stripeState: unknown = await (await fetch(`${context.mock}/__state`)).json()
     const stripeTotal = readStripeTotal(stripeState, invoice.stripe_invoice_id ?? '')
+    // The UI lists the net total; Stripe adds 20% VAT through the tax rate on each item.
+    const grossPence = uiPence === null ? null : uiPence + Math.round(uiPence * 20 / 100)
     if (context.isPending('northwind-stripe-total')) {
-      context.note(`pending sub-check northwind-stripe-total: Stripe invoice total is ${stripeTotal}, UI ${uiPence}`)
+      context.note(`pending sub-check northwind-stripe-total: Stripe invoice total is ${stripeTotal}, UI net ${uiPence}`)
     } else {
-      assert(stripeTotal === uiPence, `Stripe invoice total ${stripeTotal} must equal UI ${uiPence}`)
+      assert(stripeTotal === grossPence, `Stripe invoice total ${stripeTotal} must equal UI net ${uiPence} + 20% VAT = ${grossPence}`)
     }
 
     // Client pays the hosted invoice.
@@ -85,7 +87,7 @@ export const northwindMainStory: Scenario = {
     } else {
       await sendFromSimulator(page, 'Why £1,080?')
     }
-    const answer = page.getByText(/This invoice is £1080\.00/).first()
+    const answer = page.getByText(/This invoice is £1,080\.00 net \+ £216\.00 VAT \(20%\) = £1,296\.00/).first()
     await answer.waitFor({ timeout: 30000 })
     const answerText = await answer.innerText()
     assert(answerText.includes(invoice.stripe_invoice_id ?? 'missing'), 'the why-answer must cite the Stripe invoice id')
