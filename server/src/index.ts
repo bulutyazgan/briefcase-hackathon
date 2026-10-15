@@ -7,6 +7,7 @@ import { handleApproval, startAgentLoop } from './features/agent/agent'
 import { getApproval, getEvent, getInvoice, getState } from './features/ledger/store'
 import { leadsCsv } from './features/leads/leads'
 import { controlStatus } from './features/control/control'
+import { invoiceLeadRows } from './features/meters/meters'
 
 const leadsSchema = z.array(z.object({
   name: z.string(),
@@ -47,6 +48,12 @@ app.get('/api/leads/:invoiceId.csv', (context) => {
     'content-type': 'text/csv; charset=utf-8',
     'content-disposition': `attachment; filename="tally-${invoice.id}.csv"`,
   })
+})
+
+app.get('/api/invoices/:id/leads', (context) => {
+  const rows = invoiceLeadRows(context.req.param('id'))
+  if (!rows) return context.json({ error: 'Invoice not found.' }, 404)
+  return context.json({ leads: rows })
 })
 
 app.get('/api/invoices/:id/pdf', async (context) => {

@@ -235,3 +235,26 @@ export function setSetting(key: string, value: string): void {
     ON CONFLICT(key) DO UPDATE SET value = excluded.value
   `).run(key, value)
 }
+
+// Insert-once by deterministic id: returns false when the event was already recorded.
+export function recordEventOnce(event: Omit<EventRow, 'created_at'>): boolean {
+  const result = database.query(`
+    INSERT OR IGNORE INTO events (id, message_id, step, summary, data_json, policy_clause, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    event.id,
+    event.message_id,
+    event.step,
+    event.summary,
+    event.data_json,
+    event.policy_clause,
+    new Date().toISOString(),
+  )
+  return result.changes > 0
+}
+
+export function listStepEvents(messageId: string, step: string): EventRow[] {
+  return database.query<EventRow, [string, string]>(`
+    SELECT * FROM events WHERE message_id = ? AND step = ? ORDER BY created_at ASC, rowid ASC
+  `).all(messageId, step)
+}
