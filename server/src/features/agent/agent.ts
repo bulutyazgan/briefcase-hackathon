@@ -17,8 +17,14 @@ import {
 import { createInvoice, BillingBlockedError, readStripeInvoiceStatus } from '../billing/billing'
 import { reply } from '../channels/channel'
 import { canonicalClientName, recallFacts, recallSeededFacts, rememberFact } from '../memory/memory'
-import { leadsCsv, seedLeads, sourceLeads, type Lead } from '../leads/leads'
+import { leadsCsv, type Lead } from '../leads/leads'
+import { defaultSourcer } from '../leads/default-sourcer'
+import type { Sourcer } from '../leads/sourcing'
+import { findClient } from '../clients/clients'
 import { decide, type BillableIntent, type Decision, type MemoryFact } from '../policy/decide'
+import { discountTermsSchema, extractDiscountTerms, type DiscountTerms } from '../pricing/discount'
+import { settleOrder } from '../pricing/order'
+import { sourcingCapMicro } from '../pricing/pricing'
 import { renderInvoicePdf } from '../invoice-pdf/render'
 
 const intentSchema = z.object({
@@ -26,6 +32,7 @@ const intentSchema = z.object({
   clientName: z.string(),
   ask: z.string(),
   icp: z.string(),
+  signals: z.array(z.string()),
   quantity: z.number().int().nullable(),
   quote: z.string(),
 })
@@ -53,6 +60,10 @@ const savedDecisionSchema = z.object({
   facts: z.array(memoryFactSchema),
   leads: z.array(leadSchema),
   decision: decisionSchema,
+  discountTerms: discountTermsSchema.nullable().default(null),
+  // 'priced': decided before sourcing. 'sourced': leads bought, decision re-priced.
+  stage: z.enum(['priced', 'sourced']).default('priced'),
+  costMicro: z.number().default(0),
 })
 
 type SavedDecision = {
@@ -60,7 +71,13 @@ type SavedDecision = {
   facts: MemoryFact[]
   leads: Lead[]
   decision: Decision
+  discountTerms: DiscountTerms | null
+  stage: 'priced' | 'sourced'
+  costMicro: number
 }
+
+// The one place the loop's lead source is chosen. Swap for the Treg sourcer here.
+const sourcer: Sourcer = defaultSourcer
 
 function recordStep(
   messageId: string,
@@ -79,19 +96,31 @@ function recordStep(
   })
 }
 
+const SIGNAL_PATTERNS: Array<[RegExp, string]> = [
+  [/\b(just\s+)?raised|funding|series\s+[a-e]\b/i, 'recently raised funding'],
+  [/\bhiring\b/i, 'hiring'],
+  [/\bnew\s+(cfo|ceo|cto|hire)s?\b/i, 'new executive hire'],
+  [/\bexpand(ing|ed)?\b/i, 'expanding'],
+  [/\bacquir(ed|ing|ition)\b/i, 'acquisition activity'],
+]
+
+export function heuristicSignals(text: string): string[] {
+  return SIGNAL_PATTERNS.flatMap(([pattern, signal]) => pattern.test(text) ? [signal] : [])
+}
+
 function heuristicIntent(message: ChannelMessage): BillableIntent {
   const quantityMatch = message.text.match(/\b(\d{1,5})\s+(?:fintech\s+)?(?:CFO\s+)?leads?\b/i)
   const quantity = quantityMatch?.[1] ? Number(quantityMatch[1]) : null
-  const isClientMessage = /Client — Northwind/i.test(message.author) || message.channel.startsWith('slack:')
+  const client = findClient(message.author)
+  const isClientMessage = /^Client\b/i.test(message.author) || client !== null || message.channel.startsWith('slack:')
   return {
     isCommitment: isClientMessage
       && /\b(let'?s|go ahead|order|kick off|please proceed)\b/i.test(message.text)
       && quantity !== null,
-    clientName: /northwind/i.test(message.author) || message.channel.startsWith('slack:')
-      ? 'Northwind Capital'
-      : message.author,
+    clientName: client?.name ?? (message.channel.startsWith('slack:') ? 'Northwind Capital' : message.author),
     ask: message.text,
     icp: /fintech/i.test(message.text) ? 'fintech CFOs in London' : message.text,
+    signals: heuristicSignals(message.text),
     quantity,
     quote: message.text,
   }
@@ -104,6 +133,7 @@ async function extractIntent(message: ChannelMessage): Promise<{ intent: Billabl
   const prompt = [
     'Extract a billable client commitment from this message.',
     'The quote must be an exact substring. Do not invent any details.',
+    'signals are buying signals the client asked for (e.g. "just raised", "hiring"); empty if none.',
     `Message author: ${message.author}`,
     `Message: ${message.text}`,
   ].join('\n')
@@ -190,8 +220,8 @@ async function continueBilling(message: ChannelMessage, saved: SavedDecision): P
     const pdfUrl = pdfPath ? `/api/invoices/${message.id}/pdf` : 'PDF unavailable'
     const leadUrl = `/api/leads/${message.id}.csv`
     const availableNote = leads.length < (intent.quantity ?? leads.length)
-      ? `The search returned ${leads.length} leads. The invoice uses the requested quantity; the delivered list contains the leads found.`
-      : `${leads.length} leads were found.`
+      ? `We found ${leads.length} of the ${intent.quantity} leads requested. The invoice covers only the ${leads.length} delivered.`
+      : `${leads.length} leads are ready.`
     await reply(message, [
       `Invoice created for £${(decision.totalPence / 100).toFixed(2)}.`,
       result.hostedUrl,
@@ -217,14 +247,77 @@ async function continueBilling(message: ChannelMessage, saved: SavedDecision): P
   }
 }
 
+async function requestApproval(
+  message: ChannelMessage,
+  amount: string,
+  reason: string,
+  clauses: string[],
+): Promise<void> {
+  saveApproval({ id: message.id, message_id: message.id, status: 'pending', reason })
+  recordStep(message.id, 'approval', 'Requested account-owner approval.', { amount, reason, clauses }, clauses)
+  await reply(message, `Approval required for ${amount}. ${reason} Review the approval card in Tally.`)
+}
+
+// Decide, then buy, then bill: only runs once the order is auto-approved or approved (P4).
+async function sourceAndBill(message: ChannelMessage, priced: SavedDecision): Promise<void> {
+  const { intent, facts, discountTerms } = priced
+  const requestedQuantity = intent.quantity ?? 0
+  const maxTotalCostMicro = sourcingCapMicro(priced.decision.totalPence)
+  const sourcing = await sourcer({
+    orderId: message.id,
+    icp: intent.icp,
+    signals: intent.signals,
+    quantity: requestedQuantity,
+    maxTotalCostMicro,
+  })
+  // Internal audit only: provider names never reach the client.
+  recordStep(message.id, 'source', `Bought ${sourcing.leads.length} leads for ${sourcing.costMicro} micro-USD.`, {
+    source: sourcing.source,
+    calls: sourcing.calls,
+    costMicro: sourcing.costMicro,
+    maxTotalCostMicro,
+  }, ['P9', 'P10'])
+
+  const settled = settleOrder(intent, facts, discountTerms, requestedQuantity, sourcing)
+  const leads: Lead[] = settled.leads.map(({ name, company, url }) => ({ name, company, url }))
+  recordStep(message.id, 'size', `Sourced ${leads.length} of ${requestedQuantity} leads.`, {
+    requested: requestedQuantity,
+    found: leads.length,
+    leads,
+    csv: leadsCsv(leads),
+  })
+  const saved: SavedDecision = {
+    intent,
+    facts,
+    leads,
+    decision: settled.decision,
+    discountTerms,
+    stage: 'sourced',
+    costMicro: settled.costMicro,
+  }
+  recordStep(message.id, 'margin', settled.decision.reason, settled.margin, ['P8'])
+  recordStep(message.id, 'decide', settled.decision.reason, saved, settled.decision.clauses)
+
+  if (settled.decision.outcome === 'refuse') {
+    await reply(message, `I could not source any leads for this order, so no invoice was created. ${settled.decision.reason}`)
+    return
+  }
+  if (settled.decision.outcome === 'needs_approval') {
+    const amount = `£${(settled.decision.totalPence / 100).toFixed(2)}`
+    await requestApproval(message, amount, `${amount}: ${settled.decision.reason}`, ['P8'])
+    return
+  }
+  await continueBilling(message, saved)
+}
+
 async function processMessage(message: ChannelMessage): Promise<void> {
   try {
     if (/\bwhy\b/i.test(message.text) && await explainLatestInvoice(message)) return
     const extracted = await extractIntent(message)
     const intent = extracted.intent
-    intent.clientName = message.channel === 'simulator' && message.author === 'Client — Northwind'
-      ? 'Northwind Capital'
-      : await canonicalClientName(intent.clientName)
+    // P5: the sender identifies the client; the extracted name is only a fallback.
+    const knownClient = findClient(message.author) ?? findClient(await canonicalClientName(intent.clientName))
+    intent.clientName = knownClient?.name ?? intent.clientName
     const quoteValid = intent.quote.length > 0 && message.text.includes(intent.quote)
     if (!quoteValid) intent.isCommitment = false
     recordStep(message.id, 'extract', quoteValid ? 'Extracted a commitment and validated its verbatim quote.' : 'No valid source quote was found.', {
@@ -248,43 +341,36 @@ async function processMessage(message: ChannelMessage): Promise<void> {
       facts = await recallFacts(intent.clientName, intent.ask)
     } catch (error) {
       recordStep(message.id, 'recall', 'Cognee recall failed; using the seeded memory facts.', { error: String(error) })
-      facts = await recallSeededFacts('Northwind Capital')
+      facts = await recallSeededFacts(intent.clientName)
     }
     recordStep(message.id, 'recall', `Recalled ${facts.length} client memory facts.`, { facts })
 
-    let leads: Lead[] = []
-    try {
-      leads = await sourceLeads(intent.icp, intent.quantity ?? 1)
-    } catch (error) {
-      recordStep(message.id, 'size', 'Firecrawl search failed; using the seeded lead list.', { error: String(error) })
-      leads = await seedLeads()
-    }
-    recordStep(message.id, 'size', `Sourced ${leads.length} leads.`, {
-      requested: intent.quantity,
-      found: leads.length,
-      leads,
-      csv: leadsCsv(leads),
-    })
+    const discount = await extractDiscountTerms(facts)
+    recordStep(message.id, 'discount', discount.terms
+      ? `Extracted a remembered discount: ${discount.terms.percent}% over ${discount.terms.threshold} leads.`
+      : 'No remembered discount was extracted.', { terms: discount.terms, model: discount.model }, ['P3'])
 
-    const billedQuantity = intent.quantity ?? leads.length
-    const decision = decide(intent, facts, billedQuantity, leads.length)
-    recordStep(message.id, 'price', `Priced ${billedQuantity} leads at £4 per lead.`, {
-      ratePence: 400,
-      requestedQuantity: billedQuantity,
-      foundQuantity: leads.length,
+    const requestedQuantity = intent.quantity ?? 0
+    const decision = decide(intent, facts, requestedQuantity, discount.terms)
+    const client = findClient(intent.clientName)
+    recordStep(message.id, 'price', client
+      ? `Priced ${requestedQuantity} leads at £${(client.pricePerLeadPence / 100).toFixed(2)} per lead.`
+      : 'Could not price: unknown client.', {
+      ratePence: client?.pricePerLeadPence ?? null,
+      requestedQuantity,
       discount: decision.lines[0]?.memoryFact ?? 'No eligible discount',
       totalPence: decision.totalPence,
-    }, [
-      'P2',
-      ...(decision.lines.some((line) => !line.memoryFact.includes('No eligible discount')) ? ['P3'] : []),
-    ])
-    const saved = { intent, facts, leads, decision }
-    recordStep(message.id, 'decide', decision.reason, {
-      decision,
+    }, decision.clauses.filter((clause) => clause === 'P2' || clause === 'P3' || clause === 'P5'))
+    const saved: SavedDecision = {
       intent,
       facts,
-      leads,
-    }, decision.clauses)
+      leads: [],
+      decision,
+      discountTerms: discount.terms,
+      stage: 'priced',
+      costMicro: 0,
+    }
+    recordStep(message.id, 'decide', decision.reason, saved, decision.clauses)
 
     if (decision.outcome === 'refuse') {
       await reply(message, `I will not create an invoice. ${decision.reason} Policy: ${decision.clauses.join(', ')}.`)
@@ -294,22 +380,11 @@ async function processMessage(message: ChannelMessage): Promise<void> {
     if (decision.outcome === 'needs_approval') {
       const amount = `£${(decision.totalPence / 100).toFixed(2)}`
       const reason = `${amount} exceeds the £1,000 auto-send limit.`
-      saveApproval({
-        id: message.id,
-        message_id: message.id,
-        status: 'pending',
-        reason,
-      })
-      recordStep(message.id, 'approval', 'Requested account-owner approval.', {
-        amount,
-        reason,
-        clauses: decision.clauses,
-      }, ['P4'])
-      await reply(message, `Approval required for ${amount}. ${reason} Review the approval card in Tally.`)
+      await requestApproval(message, amount, reason, ['P4'])
       markMessageProcessed(message.id)
       return
     }
-    await continueBilling(message, saved)
+    await sourceAndBill(message, saved)
     markMessageProcessed(message.id)
   } catch (error) {
     recordStep(message.id, 'error', 'The agent could not complete this message.', { error: String(error) })
@@ -325,19 +400,21 @@ async function processApprovedMessage(messageId: string): Promise<void> {
     if (message) await reply(message, 'I could not load the saved decision. Please send the request again.')
     return
   }
-  await continueBilling(message, saved)
+  if (saved.stage === 'sourced') await continueBilling(message, saved)
+  else await sourceAndBill(message, saved)
 }
 
 export async function handleApproval(messageId: string, action: 'approve' | 'reject'): Promise<void> {
   const message = getMessage(messageId)
   if (!message) return
   updateApproval(messageId, action === 'approve' ? 'approved' : 'rejected')
+  const clause = findSavedDecision(messageId)?.stage === 'sourced' ? 'P8' : 'P4'
   recordStep(messageId, 'approval', action === 'approve' ? 'Account owner approved billing.' : 'Account owner rejected billing.', {
     action,
-    policyClause: 'P4',
-  }, ['P4'])
+    policyClause: clause,
+  }, [clause])
   if (action === 'approve') {
-    await reply(message, 'Approved. Tally is creating the invoice.')
+    await reply(message, 'Approved. Tally is preparing the invoice.')
     await processApprovedMessage(messageId)
     markMessageProcessed(messageId)
     return

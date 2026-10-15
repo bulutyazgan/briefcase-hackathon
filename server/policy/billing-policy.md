@@ -1,9 +1,14 @@
 # Billing policy
 
 - `P1` Bill only from a client message that contains an explicit commitment ("let's do", "go ahead", "order", a quantity).
-- `P2` Prices come from the rate card only. Lead list £4/lead, setup £0.
+- `P2` Prices come from the client's price list only (e.g. Northwind £4/lead, Acme £5/lead). The client is billed for leads actually bought and delivered.
 - `P3` Discounts only if remembered as agreed (Cognee fact with date) and never above 15%.
 - `P4` Auto-send invoices up to £1,000. Above that, one approval from the account owner.
-- `P5` Known clients only (Stripe customer exists or is in the client list). Unknown → ask, do not bill.
+- `P5` Known clients only (in the seeded client list). Unknown → ask, do not bill.
 - `P6` One invoice per commitment message (idempotency).
 - `P7` Reminders at most once per 24 h, and never after a remembered dispute.
+- `P8` Margin ≥ 40% over Treg sourcing cost, otherwise the invoice needs approval.
+- `P9` Sourcing spend caps: every Treg call carries `X-Treg-Route-Max-Cost`, and each order has a total sourcing cap. Code enforces both.
+- `P10` Treg calls only to an allowlist of catalogue endpoints (people, company, buying signals).
+
+Notes for code: the order sourcing cap (P9) is 60% of the invoice net. Sourcing cost (micro-USD) is compared with invoice amounts (pence) at a fixed rate of 1 USD = 79p.
