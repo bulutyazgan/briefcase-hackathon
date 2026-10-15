@@ -35,6 +35,7 @@ export async function createInvoice(
 
   const invoice = await stripe.invoices.create({
     customer: customer.id,
+    currency: 'gbp',
     collection_method: 'send_invoice',
     days_until_due: 7,
     auto_advance: false,
@@ -43,7 +44,7 @@ export async function createInvoice(
       client_id: client.id,
       decision_clauses: decision.clauses.join(','),
     },
-  }, { idempotencyKey: `invoice-${messageId}` })
+  }, { idempotencyKey: `invoice-gbp-${messageId}` })
 
   for (const [index, line] of decision.lines.entries()) {
     await stripe.invoiceItems.create({
@@ -56,11 +57,11 @@ export async function createInvoice(
           ? `; agreed discount £${((line.quantity * line.unitPricePence - line.totalPence) / 100).toFixed(2)}`
           : ''
       }`,
-    }, { idempotencyKey: `invoice-item-${messageId}-${index}` })
+    }, { idempotencyKey: `invoice-item-gbp-${messageId}-${index}` })
   }
 
   const finalized = await stripe.invoices.finalizeInvoice(invoice.id, {}, {
-    idempotencyKey: `finalize-${messageId}`,
+    idempotencyKey: `finalize-gbp-${messageId}`,
   })
   const hostedUrl = finalized.hosted_invoice_url
   if (!hostedUrl) throw new Error('Stripe did not return a hosted invoice URL.')
