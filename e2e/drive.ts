@@ -14,7 +14,7 @@ import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { chromium, type Page } from 'playwright'
 import type { LoggedRequest } from './mock-providers/server'
-import { ledger, postSimulatorMessage, sendFromSimulator } from './support/harness'
+import { approvalCard, ledger, openInbox, openInvoicePage, postSimulatorMessage, sendFromSimulator, stripeInvoiceLink } from './support/harness'
 import { apiBase, artifactsDir, chromePath, mockBase, webBase } from './support/stack'
 
 const [command = 'snap', ...rest] = process.argv.slice(2)
@@ -49,16 +49,17 @@ if (command === 'log') {
 const browser = await chromium.launch({ headless: true, ...(existsSync(chromePath) ? { executablePath: chromePath } : {}) })
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } })
 try {
-  await page.goto(webBase)
-  await page.getByRole('heading', { name: 'Client channel' }).waitFor()
+  await openInbox(page, webBase)
   if (command === 'send') {
     if (author) await page.getByLabel('Send as').selectOption(author)
     await sendFromSimulator(page, args.join(' '))
   } else if (command === 'approve' || command === 'reject') {
-    await page.getByRole('region', { name: 'Invoice approval' }).first()
-      .getByRole('button', { name: command === 'approve' ? 'Approve invoice' : 'Reject' }).click()
+    await approvalCard(page).getByRole('button', { name: command === 'approve' ? 'Approve invoice' : 'Reject' }).click()
   } else if (command === 'pay') {
-    const href = await page.getByRole('region', { name: 'Invoices' }).getByRole('link', { name: 'Open Stripe invoice' }).getAttribute('href')
+    const newest = (await ledger(apiBase)).invoices[0]
+    if (!newest) throw new Error('No invoice to pay.')
+    await openInvoicePage(page, webBase, newest.id)
+    const href = await stripeInvoiceLink(page).getAttribute('href')
     const hosted = await browser.newPage()
     await hosted.goto(href ?? '')
     await hosted.getByRole('button', { name: 'Pay with 4242' }).click()

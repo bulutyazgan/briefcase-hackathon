@@ -1,5 +1,5 @@
 import { mkdir } from 'node:fs/promises'
-import type { Browser, Page } from 'playwright'
+import type { Browser, Locator, Page } from 'playwright'
 import type { LoggedRequest } from '../mock-providers/server'
 
 export interface HarnessUrls {
@@ -69,6 +69,55 @@ export function stripeCalls(log: LoggedRequest[], method: string, pattern: RegEx
 export async function sendFromSimulator(page: Page, text: string): Promise<void> {
   await page.getByLabel('Message').fill(text)
   await page.getByRole('button', { name: 'Send' }).click()
+}
+
+// Routes of the dashboard: the inbox holds the composer and approval cards, an
+// invoice page holds the evidence trail and the Stripe link, the audit page the trail.
+export async function openInbox(page: Page, web: string): Promise<void> {
+  await page.goto(`${web}/app/inbox`)
+  await page.getByRole('heading', { name: 'Client channel' }).waitFor()
+  await page.getByLabel('Send as').waitFor()
+}
+
+export async function openInvoicePage(page: Page, web: string, invoiceId: string): Promise<void> {
+  await page.goto(`${web}/app/invoices/${encodeURIComponent(invoiceId)}`)
+  await page.getByRole('heading', { name: 'Evidence trail' }).waitFor()
+}
+
+export async function openInvoiceList(page: Page, web: string): Promise<void> {
+  await page.goto(`${web}/app/invoices`)
+  await page.getByRole('heading', { name: 'Invoices', exact: true }).waitFor()
+}
+
+export async function openAudit(page: Page, web: string): Promise<void> {
+  await page.goto(`${web}/app/audit`)
+  await page.getByRole('heading', { name: 'Audit trail' }).waitFor()
+}
+
+// An approval card is a list item under "Pending approvals" headed "Approval needed".
+export function approvalCard(page: Page): Locator {
+  return page.getByRole('listitem').filter({ hasText: 'Approval needed' }).first()
+}
+
+export function stripeInvoiceLink(page: Page): Locator {
+  return page.getByRole('link', { name: /(View|Open) Stripe invoice/ })
+}
+
+// Invoice rows in the ledger once Stripe has created and finalized them.
+export async function waitForStripeInvoice(api: string, timeoutMs = 45000): Promise<LedgerState['invoices'][number]> {
+  return waitFor('a Stripe invoice in the ledger', async () => {
+    const state = await ledger(api)
+    return state.invoices.find((invoice) => invoice.stripe_invoice_id !== null && invoice.hosted_url !== null)
+  }, timeoutMs)
+}
+
+export async function payOnHostedPage(context: ScenarioContext, hostedHref: string): Promise<void> {
+  const hosted = await context.browser.newPage()
+  await hosted.goto(hostedHref)
+  await hosted.getByRole('button', { name: 'Pay with 4242' }).click()
+  await hosted.getByTestId('paid').waitFor()
+  await hosted.screenshot({ path: `${context.artifactsDir}/${context.name}/hosted-invoice-paid.png` })
+  await hosted.close()
 }
 
 // The simulator UI only offers Northwind and the account owner as senders, so

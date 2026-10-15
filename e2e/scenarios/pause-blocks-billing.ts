@@ -1,4 +1,4 @@
-import { assert, ledger, sendFromSimulator, stripeCalls, waitFor, type Scenario } from '../support/harness'
+import { assert, ledger, openInbox, sendFromSimulator, stripeCalls, waitFor, type Scenario } from '../support/harness'
 import { NORTHWIND_ASK } from './northwind-main-story'
 
 export const pauseBlocksBilling: Scenario = {
@@ -6,8 +6,7 @@ export const pauseBlocksBilling: Scenario = {
   title: 'F1: /pause stops billing until the account owner sends /resume',
   async run(context) {
     const { page, api } = context
-    await page.goto(context.web)
-    await page.getByRole('heading', { name: 'Client channel' }).waitFor()
+    await openInbox(page, context.web)
     await sendFromSimulator(page, '/pause')
     await page.getByText(/Tally is paused \(F1 kill switch\)\. No billing/).first().waitFor({ timeout: 30000 })
     const control: unknown = await (await fetch(`${api}/api/control`)).json()

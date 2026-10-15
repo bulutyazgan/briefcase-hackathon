@@ -1,5 +1,5 @@
 import { Database } from 'bun:sqlite'
-import { assert, ledger, sendFromSimulator, stripeCalls, waitFor, type Scenario } from '../support/harness'
+import { approvalCard, assert, ledger, openInbox, openInvoiceList, sendFromSimulator, stripeCalls, waitFor, waitForStripeInvoice, type Scenario } from '../support/harness'
 import { NORTHWIND_ASK } from './northwind-main-story'
 
 // P6: the same commitment message processed twice yields one Stripe invoice.
@@ -10,15 +10,14 @@ export const replaySafety: Scenario = {
   title: 'P6: one Stripe invoice per commitment message, even when replayed',
   async run(context) {
     const { page, api } = context
-    await page.goto(context.web)
-    await page.getByRole('heading', { name: 'Client channel' }).waitFor()
+    await openInbox(page, context.web)
     await sendFromSimulator(page, NORTHWIND_ASK)
-    const approvalCard = page.getByRole('region', { name: 'Invoice approval' })
-    await approvalCard.waitFor({ timeout: 30000 })
+    const card = approvalCard(page)
+    await card.waitFor({ timeout: 30000 })
     const approvedAt = new Date().toISOString()
-    await approvalCard.getByRole('button', { name: 'Approve invoice' }).click()
-    const invoicesPanel = page.getByRole('region', { name: 'Invoices' })
-    await invoicesPanel.getByRole('button', { name: /in_mock_/ }).first().waitFor({ timeout: 30000 })
+    await card.getByRole('button', { name: 'Approve invoice' }).click()
+    await waitForStripeInvoice(api)
+    await page.getByText(/Invoice created for £1,080\.00/).first().waitFor({ timeout: 30000 })
     await context.shot('first-pass-invoiced')
 
     const first = await ledger(api)
@@ -56,10 +55,10 @@ export const replaySafety: Scenario = {
 
     // If the replay re-opened the approval, approve it again like a user would.
     await Bun.sleep(2000)
-    const reopened = await approvalCard.isVisible()
+    const reopened = await card.isVisible()
     if (reopened) {
-      await approvalCard.getByRole('button', { name: 'Approve invoice' }).click()
-      await waitFor('replayed approval to close', async () => !(await approvalCard.isVisible()), 30000)
+      await card.getByRole('button', { name: 'Approve invoice' }).click()
+      await waitFor('replayed approval to close', async () => !(await card.isVisible()), 30000)
       await Bun.sleep(2500)
     }
     context.note(`replay re-opened approval: ${reopened}`)
@@ -67,7 +66,10 @@ export const replaySafety: Scenario = {
 
     const final = await ledger(api)
     assert(final.invoices.length === 1, `ledger must hold one invoice after replay, has ${final.invoices.length}`)
-    assert(await invoicesPanel.getByRole('button', { name: /in_mock_/ }).count() === 1, 'invoices view must list one invoice')
+    await openInvoiceList(page, context.web)
+    const rows = await page.getByRole('table').getByRole('row').count()
+    assert(rows === 2, `invoices table must list one invoice (one header row + one row), has ${rows} rows`)
+    await context.shot('invoice-list')
     const log = await context.mockLog()
     const created = stripeCalls(log, 'POST', /^\/v1\/invoices$/)
     const ids = new Set(created.map((entry) => entry.headers['idempotency-key']))

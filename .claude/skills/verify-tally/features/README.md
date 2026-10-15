@@ -37,4 +37,12 @@ Each file: H1, one paragraph, then `Sub-features`, `How to get to it (user POV)`
 - [Invoices and evidence](./invoices-evidence.md): invoice list, amount, quote, memory fact, clauses.
 - [Hosted payment and delivery](./hosted-pay-delivery.md): client pays the Stripe hosted invoice, Tally posts the lead list.
 - [Why-explain](./why-explain.md): "Why £1,080?" answered with cited evidence.
-- [Kill switch](./kill-switch.md): `/pause` and `/resume` (F1) and the Guardrails panel.
+- [Kill switch](./kill-switch.md): `/pause` and `/resume` (F1).
+- Credit notes (P11): `bun run e2e globex-dispute`. Agent-to-agent buyer (B1–B3): `bun run e2e buyer-agent` (pending, see `e2e/pending.ts`).
+
+The UI is routed since the redesign: `/app/inbox` (composer, "Pending approvals"
+cards), `/app/invoices` (table), `/app/invoices/<id>` ("Evidence trail", `View
+Stripe invoice`), `/app/audit`. Where a recipe below names the old single-page
+panels ("Invoice approval" region, "Invoices" panel, `Open Stripe invoice`,
+"Evidence for this invoice", Guardrails), read the current selectors in
+`../SKILL.md`; the scripted scenarios are the maintained source.

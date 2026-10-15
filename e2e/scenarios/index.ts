@@ -1,5 +1,7 @@
 import type { Scenario } from '../support/harness'
 import { acmeAutoSend } from './acme-auto-send'
+import { buyerAgent } from './buyer-agent'
+import { globexDispute } from './globex-dispute'
 import { northwindMainStory } from './northwind-main-story'
 import { pauseBlocksBilling } from './pause-blocks-billing'
 import { replaySafety } from './replay-safety'
@@ -14,4 +16,6 @@ export const scenarios: Scenario[] = [
   pauseBlocksBilling,
   acmeAutoSend,
   tregSourcing,
+  buyerAgent,
+  globexDispute,
 ]

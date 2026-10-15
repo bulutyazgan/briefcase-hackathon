@@ -55,7 +55,8 @@ clean up and relaunch.
 
 Scripted scenario ids (see `e2e/scenarios/index.ts`): `northwind-main-story`,
 `unknown-sender-refused`, `replay-safety`, `pause-blocks-billing`,
-`acme-auto-send` (pending), `treg-sourcing` (pending). `e2e/pending.ts` says why
+`acme-auto-send`, `treg-sourcing`, `globex-dispute`, `buyer-agent` (pending:
+the Stripe mock lacks `POST /v1/invoices/:id/send`). `e2e/pending.ts` says why
 each pending id is skipped; remove the id when the feature lands.
 
 Ad-hoc actions against a launched stack (each waits for the 2s agent loop, or 12s
@@ -73,14 +74,37 @@ bun e2e/drive.ts state              # ledger summary (read-only)
 bun e2e/drive.ts log                # every mock provider request
 ```
 
-Stable handles (Playwright): message box `getByLabel('Message')`, sender
-`getByLabel('Send as')` (options `Client — Northwind`, `Account owner`), button
-`Send`; approval `getByRole('region', { name: 'Invoice approval' })` with buttons
-`Approve invoice` / `Reject`; invoices `getByRole('region', { name: 'Invoices' })`,
-invoice rows are buttons named `in_mock_… £… · <status>`, link `Open Stripe invoice`,
-heading `Evidence for this invoice`, clauses `getByLabel('Policy clauses')`;
-guardrails heading `Guardrails`; audit heading `Audit trail`. Hosted invoice page:
-button `Pay with 4242`, `getByTestId('paid')`.
+Routes: landing `/`, dashboard `/app/inbox` (composer, thread, "Pending
+approvals"), `/app/invoices` (table), `/app/invoices/<ledger id>` (amount, Stripe
+link, PDF, "Evidence trail"), `/app/audit` ("Audit trail"), `/app/policy`. The UI
+polls `/api/state` every second. Helpers in `e2e/support/harness.ts`: `openInbox`,
+`openInvoicePage`, `openInvoiceList`, `openAudit`, `approvalCard`,
+`stripeInvoiceLink`, `waitForStripeInvoice`, `payOnHostedPage`.
+
+Stable handles (Playwright): inbox heading `Client channel` (h2), message box
+`getByLabel('Message')`, sender `getByLabel('Send as')` (options `Client —
+Northwind`, `Account owner`), button `Send`; approval card
+`getByRole('listitem').filter({ hasText: 'Approval needed' })` under heading
+`Pending approvals`, with buttons `Approve invoice` / `Reject`; invoice page h1
+`£1,080.00 awaiting payment` → `£1,080.00 collected from Northwind`, link `View
+Stripe invoice` (hosted mock page), button `Pay as client (test card)`, heading
+`Evidence trail` with labels `Client quote`, `Remembered agreement`,
+`Arithmetic`, `Policy clauses` (clause links `P1`, `P3`, `P4`); invoice list
+heading `Invoices` with a table (Client link, Amount, Status `Open`/`Paid`) or
+`No invoices have been created yet.`; audit heading `Audit trail` (event summary,
+step tag, clause, message id). Hosted invoice page: button `Pay with 4242`,
+`getByTestId('paid')`. Agent replies are `article` elements in the thread:
+`Approval required for £1080.00…`, `Invoice created for £1,080.00 net + £216.00
+VAT (20%) = £1,296.00.`, `Payment received. Here is the lead list.`, `This invoice
+is £1,080.00 net + … because the client agreed to the work.`, `Credit note cn_…
+issued for £40.00 against invoice in_mock_…`.
+
+The simulator continues an author's latest thread, so "Why £1,080?" and a
+dispute typed in the composer land in the invoice thread. Senders the composer
+lacks (`Client — Globex`, `Client — Acme Ventures`) go through
+`POST /api/channels/simulator/messages`; the buyer agent starts with
+`POST /api/buyer/start`; `POST /api/invoices/:id/simulate-payment` pays with the
+test card.
 
 Mock assertions: `GET http://127.0.0.1:4010/__log` (provider, method, path,
 headers incl. `idempotency-key`, form body, status, response headers),
