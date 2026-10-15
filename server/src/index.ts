@@ -30,7 +30,7 @@ import { listOpportunityViews } from './features/opportunities/opportunities'
 import { companyStatus, learnCompany } from './features/company/company'
 import { seedClientMemoryToCognee } from './features/memory/memory'
 import { seedCompanyKnowledge } from './features/memory/company'
-import { listClients } from './features/ledger/store'
+import { allClients } from './features/clients/clients'
 import { staffRoutes } from './features/staff/routes'
 
 const leadSchema = z.object({
@@ -75,7 +75,7 @@ app.route('/api/buyer', buyerRoutes)
 app.get('/api/control', (context) => context.json(controlStatus()))
 app.route('/api/books', booksRoutes)
 app.get('/api/opportunities', (context) => context.json({ opportunities: listOpportunityViews() }))
-app.get('/api/clients', (context) => context.json({ clients: listClients() }))
+app.get('/api/clients', (context) => context.json({ clients: allClients() }))
 app.route('/api/staff', staffRoutes)
 
 app.get('/api/leads', (context) => {

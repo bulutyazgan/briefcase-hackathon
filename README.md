@@ -147,9 +147,9 @@ Run the unit tests from `server/`.
 cd server && TALLY_DB_PATH=:memory: bun test
 ```
 
-The 72 tests in 11 files cover books, the buyer agent, clients, collections, control, credit notes, memory, meters, pricing, and the Treg and fallback sourcers. They call no outside service. To point the Stripe SDK at a local mock, set `STRIPE_API_BASE`.
+The 119 tests in 17 files cover books, the buyer agent, clients, collections, control, credit notes, the demo seed, intake, the ledger, memory, meters, opportunities, pricing, staff notes, subscriptions, and the Treg and fallback sourcers. They call no outside service. To point the Stripe SDK at a local mock, set `STRIPE_API_BASE`.
 
-Eight scripts in `server/scripts/` call the real services once the matching key is set. Run each from `server/`.
+Eleven scripts in `server/scripts/` call the real services once the matching key is set. Run each from `server/`.
 
 | Script | Proves | Command |
 | --- | --- | --- |
@@ -161,6 +161,9 @@ Eight scripts in `server/scripts/` call the real services once the matching key 
 | `verify-meters.ts` | Creates or finds the `qualified_lead` meter and sends one meter event. | `STRIPE_SECRET_KEY=sk_test_... bun scripts/verify-meters.ts` |
 | `verify-treg.ts` | One real, cheap Treg call to `apollo.people.search`. | `TREG_TOKEN=... bun scripts/verify-treg.ts` |
 | `verify-intake.ts` | Seeds the company knowledge base in Cognee, then posts the Initech inquiry and commitment to a scratch server and prints the onboarded client row and the P12 approval. | `bun scripts/verify-intake.ts` (reads `server/.env`) |
+| `verify-staff.ts` | Posts the Northwind order to a scratch server, approves it, waits for the Stripe invoice, then prints every staff note from `GET /api/staff/notes`. | `bun scripts/verify-staff.ts` (reads `server/.env`) |
+| `verify-subscriptions.ts` | Product, Price and Subscription for a fresh customer, a replay that changes nothing, then a monthly to yearly change with prorations (P13). | `STRIPE_SECRET_KEY=sk_test_... bun scripts/verify-subscriptions.ts` |
+| `verify-demo-seed.ts` | Seeds a scratch ledger, bills Globex's order in Stripe test mode, writes the facts to Cognee, then shows the collections tick earning one reminder. | `bun scripts/verify-demo-seed.ts` (reads `server/.env`) |
 
 What is proven against the real service so far: Treg sourcing. `bun scripts/verify-treg.ts` with the team token bought 3 leads for 2,000 micro-USD through `apollo.people.search`. Stripe billing is proven against the mock harness only, not against the Stripe test API.
 
