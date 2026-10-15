@@ -54,7 +54,9 @@ export function serverEnv(dbPath: string): Record<string, string> {
 
 export async function startServer(dbPath: string, logFile: string): Promise<() => Promise<void>> {
   const env = serverEnv(dbPath)
-  const seed = Bun.spawn(['bun', 'src/seed.ts'], { cwd: join(root, 'server'), env, stdout: 'ignore', stderr: 'inherit' })
+  // E2E_SEED=demo loads the six-beat demo state (Globex late invoice) for e2e/film-demo.ts.
+  const seedScript = process.env.E2E_SEED === 'demo' ? 'src/demo-seed.ts' : 'src/seed.ts'
+  const seed = Bun.spawn(['bun', seedScript], { cwd: join(root, 'server'), env, stdout: 'ignore', stderr: 'inherit' })
   if ((await seed.exited) !== 0) throw new Error('seed failed')
   const preload = join(e2eDir, 'support/stripe-base-preload.ts')
   const server = Bun.spawn(['bun', '--preload', preload, 'src/index.ts'], {

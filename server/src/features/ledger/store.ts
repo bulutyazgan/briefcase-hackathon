@@ -239,11 +239,12 @@ export function listThreadMessages(thread: string): ChannelMessage[] {
   return database.query<ChannelMessage, [string]>('SELECT * FROM messages WHERE thread = ? ORDER BY ts ASC').all(thread)
 }
 
-export function saveInvoice(invoice: Omit<InvoiceRow, 'created_at'>): void {
+// created_at is only given by seeds that backdate an invoice (a late payer); the agent lets SQLite stamp it.
+export function saveInvoice(invoice: Omit<InvoiceRow, 'created_at'> & { created_at?: string }): void {
   database.query(`
     INSERT OR IGNORE INTO invoices
-      (id, message_id, stripe_invoice_id, client_id, total_pence, status, hosted_url, pdf_path)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      (id, message_id, stripe_invoice_id, client_id, total_pence, status, hosted_url, pdf_path, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')))
   `).run(
     invoice.id,
     invoice.message_id,
@@ -253,6 +254,7 @@ export function saveInvoice(invoice: Omit<InvoiceRow, 'created_at'>): void {
     invoice.status,
     invoice.hosted_url,
     invoice.pdf_path,
+    invoice.created_at ?? null,
   )
 }
 
