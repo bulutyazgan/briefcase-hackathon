@@ -1,0 +1,26 @@
+/* Tokens pulled from brand/tokens.stylex.ts. One accent added for code actions (money moving). */
+@font-face { font-family: 'Geist'; src: url('../../brand/fonts/geist-latin-variable.woff2') format('woff2'); font-weight: 100 900; font-display: block; }
+@font-face { font-family: 'Geist Mono'; src: url('../../brand/fonts/geist-mono-latin-variable.woff2') format('woff2'); font-weight: 100 900; font-display: block; }
+
+:root {
+  --canvas: #FFFFFF;
+  --well: #F4F4F5;
+  --float: #FFFFFF;
+  --ink: #171717;
+  --ink2: #454545;
+  --ink3: #737373;
+  --ink4: #A1A1AA;
+  --hairline: rgba(23, 23, 23, 0.10);
+  --hairline-strong: rgba(23, 23, 23, 0.18);
+  --hover: rgba(23, 23, 23, 0.04);
+  --pressed: rgba(23, 23, 23, 0.08);
+  --accent: #1D6F42;            /* one accent: code acted, money moved. 6.2:1 on white */
+  --accent-wash: rgba(29, 111, 66, 0.10);
+  --font-sans: 'Geist', Arial, sans-serif;
+  --font-mono: 'Geist Mono', monospace;
+  --radius-tile: 16px;
+  --radius-control: 8px;
+  --radius-pill: 999px;
+  --shadow-float: 0 8px 28px rgba(23, 23, 23, 0.08), 0 1px 3px rgba(23, 23, 23, 0.04);
+  --space-xs: 8px; --space-sm: 12px; --space-md: 16px; --space-lg: 24px; --space-xl: 32px; --space-xxl: 48px;
+}
