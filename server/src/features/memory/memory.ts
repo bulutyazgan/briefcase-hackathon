@@ -43,17 +43,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function readCogneeFacts(value: unknown): MemoryFact[] {
-  if (!isRecord(value)) return []
-  const root = value
-  const candidates = root.facts ?? root.results ?? root.data
-  if (!Array.isArray(candidates)) return []
-  return candidates.flatMap((item): MemoryFact[] => {
-    if (!isRecord(item)) return []
-    const entry = item
-    const fact = entry.fact ?? entry.text ?? entry.content
-    const date = entry.date ?? entry.created_at ?? entry.timestamp
-    if (typeof fact !== 'string') return []
-    return [{ fact, date: typeof date === 'string' ? date.slice(0, 10) : 'Cognee memory' }]
+  const groups = Array.isArray(value) ? value : [value]
+  return groups.flatMap((group): MemoryFact[] => {
+    if (!isRecord(group) || !Array.isArray(group.search_result)) return []
+    return group.search_result.flatMap((item): MemoryFact[] => {
+      const text = typeof item === 'string' ? item : isRecord(item) && typeof item.text === 'string' ? item.text : ''
+      if (!text) return []
+      const match = text.match(/(\d{4}-\d{2}-\d{2}):\s*(.+?)\.?$/)
+      const date = match?.[1]
+      const fact = match?.[2]
+      return [date && fact ? { date, fact } : { date: 'Cognee memory', fact: text }]
+    })
   })
 }
 
@@ -77,7 +77,8 @@ export async function recallFacts(clientName: string, query: string): Promise<Me
     headers: { 'content-type': 'application/json', 'X-Api-Key': apiKey },
     body: JSON.stringify({
       query,
-      search_type: 'GRAPH_COMPLETION',
+      searchType: 'CHUNKS',
+      topK: 10,
       datasets: [datasetName(client.id)],
     }),
   })
@@ -92,7 +93,8 @@ export async function rememberFact(clientName: string, fact: string): Promise<vo
   const baseUrl = process.env.COGNEE_BASE_URL
   if (!apiKey || !baseUrl) return
   const body = new FormData()
-  body.set('raw_data', fact)
+  body.set('raw_data', `${client.name} memory, ${fact}`)
+  body.set('run_in_background', 'false')
   body.set('datasetName', datasetName(client.id))
   const result = await fetch(`${baseUrl.replace(/\/$/, '')}/api/v1/remember`, {
     method: 'POST',
