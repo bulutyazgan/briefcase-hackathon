@@ -1,0 +1,35 @@
+# SYNC.md: the agents' shared channel
+
+Two people, two agents, one `main`. This file is how the agents coordinate: Bulut's Claude session and Louis's agent both read it before working and append to it after. Keep entries short, dated (UTC), signed, and append-only inside each section. Pushes go straight to `main` (no PRs); fast-forward or clean merge only, never force.
+
+## Now on main
+
+- 2026-10-15 19:58 (Bulut's agent): `5971916` and the sync behind it carry the full build: policy P1–P11, O1–O4, F1–F2, B1–B3; Treg sourcing with paging and spend caps; Stripe invoices with VAT and email; credit notes; meters; buyer agent; books; opportunities; the e2e harness on the redesigned UI (7/8 green, buyer unblocked by the mock `/send` route); live verify scripts all green. Typecheck, build and 87 server tests green.
+
+## Who owns what (proposal, edit freely)
+
+- Louis's agent: web UI and design system (`web/src/components/ui`, tokens, landing), invoice PDF, the Worker deploy, Stripe account setup.
+- Bulut's agent: server layers under `server/src/features`, policy docs, the e2e harness and `verify-tally` skill, docs (README, DEMO, PLAN), live verification against Stripe/Treg/Cognee.
+- Shared files to touch with care (merge conflicts tonight came from these): `server/src/features/agent/agent.ts`, `server/src/features/billing/billing.ts`, `server/src/index.ts`, `web/src/app.tsx`, `server/package.json`. Add a hook line, keep logic in your own module.
+
+## Vision v3 (what we build next): the autonomous intake and finance agent
+
+"PostHog for deals and finance." One agent that is the company's commercial front door and back office: onboards a new client from the company knowledge base in Cognee, quotes, invoices or subscribes them in Stripe on acceptance, handles service conversations (monthly to yearly, "did you have a problem last time?"), chases late payers as a conversation (payment plans inside policy), and notifies staff. Tonight's lead-list flow is one fulfilment adapter. Next adapters, in order:
+
+1. Stripe subscriptions adapter: create/update a subscription from a conversation (monthly ↔ yearly with proration), re-issue the invoice, note to staff.
+2. Intake adapter: new-client onboarding driven by the company knowledge base (Cognee dataset `company`), producing customer + first invoice.
+3. Collections conversation: late invoice → "any trouble paying?" → payment plan under a new clause, memory of promises (P7 already blocks chasing after a dispute or promise).
+4. Staff channel: notes to the team (Slack/email) for every autonomous change.
+
+## Requests to Louis's agent
+
+- 2026-10-15 19:58 (Bulut's agent): when you change a view's headings, labels or ids, grep `e2e/support/harness.ts` and `.claude/skills/verify-tally/SKILL.md` first; the browser suite keys on them. Run `bun run e2e` (ports 4010/8797/5179, override with `MOCK_PORT`/`E2E_API_PORT`/`E2E_WEB_PORT`) before pushing UI changes.
+- The Opportunities page (`web/src/features/opportunities/view.tsx`) and Books page could use your design pass; they were built on your primitives but not by your eye.
+
+## Requests to Bulut's agent
+
+- (Louis's agent writes here.)
+
+## Decisions
+
+- 2026-10-15 (both): agreements are made in conversation; the agent handles the formalities. The LLM extracts and explains; code decides and executes. No bill without a verbatim quote. Everything on `main`, no PRs.
