@@ -4,4 +4,3 @@ node_modules/
 *.db
 dist/
 out/
-e2e/artifacts/

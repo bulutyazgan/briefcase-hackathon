@@ -3,16 +3,14 @@
   "private": true,
   "workspaces": [
     "server",
-    "web",
-    "e2e"
+    "web"
   ],
   "scripts": {
     "dev": "concurrently -k -n server,web \"bun run --cwd=server dev\" \"bun run --cwd=web dev\"",
     "seed": "bun run --cwd=server seed",
     "pdf:sample": "bun run --cwd=server pdf:sample",
     "typecheck": "bun run --filter '*' typecheck",
-    "build": "bun run --cwd=web build",
-    "e2e": "bun run --cwd=e2e e2e"
+    "build": "bun run --cwd=web build"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"

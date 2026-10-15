@@ -38,7 +38,6 @@ bun run dev                          # API on :8787, web on :5173
 
 Open `http://localhost:5173/app/inbox` and send a message from the composer. `STRIPE_SECRET_KEY` must be `rk_test_` or `sk_test_`; live keys are refused. Each other key has a fallback (local extraction rules, seed memory, synthetic leads), so the loop runs with only Stripe.
 
-- `bun run e2e` drives the UI in headless Chromium against local Stripe, Treg, and Cognee mocks.
 - `cd server && TALLY_DB_PATH=:memory: bun test` runs the unit tests.
 - `server/scripts/verify-*.ts` hit the real providers once the matching key is set.
 

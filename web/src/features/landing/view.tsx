@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import * as stylex from '@stylexjs/stylex'
-import { Button } from '../../components/ui/button'
+import { Button, ButtonLink } from '../../components/ui/button'
+import { GitHubLogo } from '../../components/ui/github-logo'
 import { Closing, Page, Opening, Section } from '../../components/ui/page'
 import { StatStrip } from '../../components/ui/stat-strip'
 import { Text } from '../../components/ui/text'
@@ -54,7 +55,7 @@ export function Landing() {
     <div {...stylex.props(styles.root)}>
       <nav aria-label="Site navigation" {...stylex.props(styles.nav)}>
         <Link to="/" {...stylex.props(styles.brand)}><TallyLogo size={20} />Tally</Link>
-        <div {...stylex.props(styles.links)}><a href="#how" {...stylex.props(styles.navLink)}>How it works</a><a href="#policy" {...stylex.props(styles.navLink)}>Policy</a><Link to="/app/inbox" {...stylex.props(content.link)}>Open the inbox</Link></div>
+        <div {...stylex.props(styles.links)}><a href="#how" {...stylex.props(styles.navLink)}>How it works</a><a href="#policy" {...stylex.props(styles.navLink)}>Policy</a><Link to="/app/inbox" {...stylex.props(content.link)}>Open the inbox</Link><ButtonLink variant="secondary" href="https://github.com/lnv-louis/tally" target="_blank" rel="noreferrer"><GitHubLogo size={16} />See on GitHub</ButtonLink></div>
       </nav>
       <div {...stylex.props(styles.content)}>
         <Page>
