@@ -1,0 +1,17 @@
+[
+  {
+    "clientName": "Northwind Capital",
+    "fact": "Agreed 10% off orders over 200 leads",
+    "date": "2026-08-12"
+  },
+  {
+    "clientName": "Northwind Capital",
+    "fact": "Pays on 7-day terms",
+    "date": "2026-08-12"
+  },
+  {
+    "clientName": "Northwind Capital",
+    "fact": "Billing contact is billing+northwind@example.com",
+    "date": "2026-08-12"
+  }
+]
