@@ -38,16 +38,42 @@ function toParams(pairs: { key: string; values: string[] }[]): TregParams {
   return params
 }
 
+// Role words Apollo indexes as titles. The rest of the ICP becomes keywords, and "in <place>" a location.
+const ROLE_TITLES: ReadonlyArray<[RegExp, string[]]> = [
+  [/\bcfos?\b|chief financial officers?|finance directors?/i, ['CFO', 'Chief Financial Officer', 'Finance Director']],
+  [/\bceos?\b|chief executive officers?/i, ['CEO', 'Chief Executive Officer']],
+  [/\bctos?\b|chief technology officers?/i, ['CTO', 'Chief Technology Officer']],
+  [/\bcoos?\b|chief operating officers?/i, ['COO', 'Chief Operating Officer']],
+  [/\bfounders?\b/i, ['Founder', 'Co-Founder']],
+  [/heads? of procurement|procurement (?:leads?|managers?)/i, ['Head of Procurement', 'Procurement Manager']],
+]
+const STOP_WORDS = new Set(['lead', 'leads', 'list', 'the', 'a', 'an', 'of', 'and', 'for', 'at', 'in', 'from', 'to', 'with'])
+
 export function titleFromIcp(icp: string): string {
   const head = icp.split(/\s+(?:at|in|from|for|@)\s+/i)[0]?.trim()
   return head && head.length > 0 ? head : icp.trim()
+}
+
+export function queryFromIcp(icp: string): { person_titles: string[]; q_keywords?: string; person_locations?: string[] } {
+  const titles = ROLE_TITLES.find(([pattern]) => pattern.test(icp))?.[1] ?? [titleFromIcp(icp)]
+  const location = icp.match(/\bin\s+([A-Z][A-Za-z .'-]+)$/)?.[1]?.trim()
+  const head = icp.split(/\s+(?:at|in|from|for|@)\s+/i)[0] ?? icp
+  const keywords = head.split(/\s+/).filter((word) => {
+    const lower = word.toLowerCase()
+    return lower.length > 2 && !STOP_WORDS.has(lower) && !ROLE_TITLES.some(([pattern]) => pattern.test(word))
+  })
+  return {
+    person_titles: titles,
+    ...(keywords.length ? { q_keywords: keywords.join(' ') } : {}),
+    ...(location ? { person_locations: [location] } : {}),
+  }
 }
 
 export function fallbackProposal(request: SourcingRequest): Proposal {
   return {
     calls: [{
       endpointId: 'apollo.people.search',
-      params: { person_titles: [titleFromIcp(request.icp)], per_page: Math.min(request.quantity, 100) },
+      params: { ...queryFromIcp(request.icp), per_page: Math.min(request.quantity, 100) },
     }],
     model: 'local-fallback',
   }
