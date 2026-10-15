@@ -20,6 +20,7 @@ import { canonicalClientName, recallFacts, recallSeededFacts, rememberFact } fro
 import { leadsCsv, seedLeads, sourceLeads, type Lead } from '../leads/leads'
 import { decide, type BillableIntent, type Decision, type MemoryFact } from '../policy/decide'
 import { renderInvoicePdf } from '../invoice-pdf/render'
+import { runCollectionsTick } from '../collections/collections'
 
 const intentSchema = z.object({
   isCommitment: z.boolean(),
@@ -360,6 +361,7 @@ export function startAgentLoop(): void {
   setInterval(() => {
     void pollInvoices()
   }, 10000)
+  setInterval(() => { void runCollectionsTick(new Date()).catch((error) => console.warn(`Collections tick failed: ${String(error)}`)) }, 60000)
 }
 
 async function pollInvoices(): Promise<void> {
