@@ -4,6 +4,9 @@ import { findAllowedEndpoint, type TregEndpoint } from './treg-catalog'
 import { createTregClient, TregCallError, TregUnavailableError, type FetchLike, type TregClient } from './treg-client'
 import { fireworksProposer, type Proposer } from './treg-proposer'
 
+// Apollo caps a page at 100 rows, so larger orders page through results.
+const MAX_PAGE_SIZE = 100
+
 const peopleSchema = z.object({
   people: z.array(z.object({
     id: z.string(),
@@ -102,52 +105,65 @@ export function createTregSourcer(deps: TregSourcerDeps = {}): Sourcer {
         calls.push({ endpointId: proposed.endpointId, accepted: false, reason: 'Endpoint is not on the Treg allowlist.', costMicro: 0, clauses: ['P10'] })
         continue
       }
-      const remainingLeads = request.quantity - leads.length
-      if (remainingLeads <= 0) {
-        calls.push({ endpointId: endpoint.id, accepted: false, reason: `Quantity ${request.quantity} already reached.`, costMicro: 0, clauses: [] })
-        continue
-      }
-      const remainingBudget = request.maxTotalCostMicro - spentMicro
-      if (endpoint.maxCostMicro > remainingBudget) {
-        calls.push({
-          endpointId: endpoint.id,
-          accepted: false,
-          reason: `Per-call cap ${endpoint.maxCostMicro} µUSD exceeds remaining order budget ${remainingBudget} µUSD.`,
-          costMicro: 0,
-          clauses: ['P9'],
-        })
-        continue
-      }
-      // Code owns page size: never ask for more rows than we still need.
-      const params = { ...proposed.params, per_page: Math.min(Math.max(remainingLeads, 1), 100) }
-      try {
-        const result = await client.call(endpoint.id, params, endpoint.maxCostMicro)
-        spentMicro += result.costMicro
-        const fresh = leadsFromBody(endpoint, result.body)
-          .filter((lead) => !seen.has(lead.id))
-          .slice(0, remainingLeads)
-        const shares = splitCost(result.costMicro, fresh.length)
-        fresh.forEach((lead, index) => {
-          seen.add(lead.id)
-          leads.push({ ...lead, provider: endpoint.provider, costMicro: shares[index] ?? 0 })
-        })
-        calls.push({
-          endpointId: endpoint.id,
-          accepted: true,
-          reason: `Allowlisted; cap ${endpoint.maxCostMicro} µUSD within order budget. ${fresh.length} leads.`,
-          costMicro: result.costMicro,
-          clauses: ['P9', 'P10'],
-        })
-      } catch (error) {
-        if (!(error instanceof TregCallError)) throw error
-        spentMicro += error.costMicro
-        calls.push({
-          endpointId: endpoint.id,
-          accepted: false,
-          reason: error.refusedOverCap ? 'Treg refused: over X-Treg-Route-Max-Cost.' : error.message,
-          costMicro: error.costMicro,
-          clauses: error.refusedOverCap ? ['P9'] : [],
-        })
+      // Every page is its own gated call: quantity, then the P9 order cap, then the per-call cap at Treg.
+      for (let page = 1; ; page += 1) {
+        const remainingLeads = request.quantity - leads.length
+        if (remainingLeads <= 0) {
+          if (page === 1) {
+            calls.push({ endpointId: endpoint.id, page, accepted: false, reason: `Quantity ${request.quantity} already reached.`, costMicro: 0, clauses: [] })
+          }
+          break
+        }
+        const remainingBudget = request.maxTotalCostMicro - spentMicro
+        if (endpoint.maxCostMicro > remainingBudget) {
+          calls.push({
+            endpointId: endpoint.id,
+            page,
+            accepted: false,
+            reason: `Per-call cap ${endpoint.maxCostMicro} µUSD exceeds remaining order budget ${remainingBudget} µUSD.`,
+            costMicro: 0,
+            clauses: ['P9'],
+          })
+          break
+        }
+        // Code owns page size: never ask for more rows than we still need.
+        const perPage = Math.min(Math.max(remainingLeads, 1), MAX_PAGE_SIZE)
+        const params = { ...proposed.params, page, per_page: perPage }
+        try {
+          const result = await client.call(endpoint.id, params, endpoint.maxCostMicro)
+          spentMicro += result.costMicro
+          const returned = leadsFromBody(endpoint, result.body)
+          const fresh = returned
+            .filter((lead) => !seen.has(lead.id))
+            .slice(0, remainingLeads)
+          const shares = splitCost(result.costMicro, fresh.length)
+          fresh.forEach((lead, index) => {
+            seen.add(lead.id)
+            leads.push({ ...lead, provider: endpoint.provider, costMicro: shares[index] ?? 0 })
+          })
+          calls.push({
+            endpointId: endpoint.id,
+            page,
+            accepted: true,
+            reason: `Allowlisted; cap ${endpoint.maxCostMicro} µUSD within order budget. Page ${page}: ${fresh.length} leads.`,
+            costMicro: result.costMicro,
+            clauses: ['P9', 'P10'],
+          })
+          // A short page means the search is exhausted; a page with nothing new means paging has stalled.
+          if (returned.length < perPage || fresh.length === 0) break
+        } catch (error) {
+          if (!(error instanceof TregCallError)) throw error
+          spentMicro += error.costMicro
+          calls.push({
+            endpointId: endpoint.id,
+            page,
+            accepted: false,
+            reason: error.refusedOverCap ? 'Treg refused: over X-Treg-Route-Max-Cost.' : error.message,
+            costMicro: error.costMicro,
+            clauses: error.refusedOverCap ? ['P9'] : [],
+          })
+          break
+        }
       }
     }
 
