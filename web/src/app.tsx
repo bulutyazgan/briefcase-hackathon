@@ -1,7 +1,11 @@
-import { useEffect, useSyncExternalStore, type ReactNode } from 'react'
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
 import * as stylex from '@stylexjs/stylex'
 import { getSnapshot, refreshState, subscribe } from './app-state'
 import { Audit } from './features/audit/view'
+import { Books } from './features/books/view'
+import { Control } from './features/control/view'
+import { useControlStatus } from './features/control/use-control-status'
+import { startBuyerAgent } from './features/inbox/api'
 import { Inbox, PendingApprovals } from './features/inbox/view'
 import { Invoices } from './features/invoices/view'
 import { Policy } from './features/policy/view'
@@ -13,6 +17,7 @@ type Route =
   | { page: 'invoices' }
   | { page: 'invoice-detail'; invoiceId: string }
   | { page: 'audit' }
+  | { page: 'books' }
   | { page: 'policy' }
   | { page: 'not-found' }
 
@@ -20,6 +25,7 @@ function resolveRoute(path: string): Route {
   if (path === '/app/inbox') return { page: 'inbox' }
   if (path === '/app/invoices') return { page: 'invoices' }
   if (path === '/app/audit') return { page: 'audit' }
+  if (path === '/app/books') return { page: 'books' }
   if (path === '/app/policy') return { page: 'policy' }
   const invoiceMatch = path.match(/^\/app\/invoices\/([^/]+)$/)
   if (invoiceMatch) {
@@ -68,6 +74,7 @@ function ShellNavigation({
     { label: 'Inbox', to: '/app/inbox', key: 'inbox', count: pendingCount },
     { label: 'Invoices', to: '/app/invoices', key: 'invoices', count: invoiceCount },
     { label: 'Audit', to: '/app/audit', key: 'audit' },
+    { label: 'Books', to: '/app/books', key: 'books' },
     { label: 'Policy', to: '/app/policy', key: 'policy' },
   ]
 
@@ -98,6 +105,45 @@ function ShellNavigation({
   )
 }
 
+const buyerAgentLabel = {
+  idle: 'Start buyer agent',
+  busy: 'Starting buyer agent…',
+  started: 'Buyer agent running',
+  failed: 'Buyer agent did not start',
+} as const
+
+type BuyerAgentPhase = keyof typeof buyerAgentLabel
+
+function StartBuyerAgentButton() {
+  const [phase, setPhase] = useState<BuyerAgentPhase>('idle')
+  const [detail, setDetail] = useState('')
+
+  async function start(): Promise<void> {
+    setPhase('busy')
+    setDetail('')
+    try {
+      await startBuyerAgent()
+      setPhase('started')
+      void refreshState()
+    } catch (reason) {
+      setPhase('failed')
+      setDetail(String(reason))
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      {...stylex.props(styles.secondaryPill)}
+      disabled={phase === 'busy' || phase === 'started'}
+      title={detail || undefined}
+      onClick={() => void start()}
+    >
+      {buyerAgentLabel[phase]}
+    </button>
+  )
+}
+
 function LoadingState() {
   return (
     <div {...stylex.props(styles.state)} role="status" aria-live="polite">
@@ -122,6 +168,7 @@ function ErrorState({ message }: { message: string }) {
 export function App() {
   const path = usePath()
   const { state, error } = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+  const control = useControlStatus()
   const route = resolveRoute(path)
   const invoiceCount = state?.invoices.length ?? 0
   const pendingCount = state?.approvals.filter((approval) => approval.status === 'pending').length ?? 0
@@ -148,6 +195,7 @@ export function App() {
         >
           New message
         </button>
+        <StartBuyerAgentButton />
         <Link to="/app/audit" {...stylex.props(styles.secondaryPill)}>View audit</Link>
       </>
     )
@@ -185,6 +233,10 @@ export function App() {
         <Link to="/app/policy" {...stylex.props(styles.secondaryPill)}>View policy</Link>
       </>
     )
+  } else if (route.page === 'books') {
+    title = 'Books'
+    subtitle = 'Double-entry journals, VAT and margin for every finalised invoice.'
+    actions = <Link to="/app/invoices" {...stylex.props(styles.secondaryPill)}>View invoices</Link>
   } else if (route.page === 'policy') {
     title = 'Billing policy'
     subtitle = 'The rules Tally applies before it prepares an invoice.'
@@ -200,7 +252,12 @@ export function App() {
         </div>
         <ShellNavigation path={path} invoiceCount={invoiceCount} pendingCount={pendingCount} />
         <div {...stylex.props(styles.railFooter)}>
-          <span {...stylex.props(styles.modePill)}>Stripe test mode</span>
+          <div {...stylex.props(styles.railPills)}>
+            <span {...stylex.props(styles.modePill)}>Stripe test mode</span>
+            {control.status?.paused && (
+              <span role="status" {...stylex.props(styles.modePill, styles.pausedPill)}>Paused</span>
+            )}
+          </div>
           <Link to="/" {...stylex.props(styles.backLink)}>Back to site</Link>
         </div>
       </aside>
@@ -238,8 +295,15 @@ export function App() {
                     )
                     : route.page === 'audit'
                       ? <Audit events={state.events} />
+                      : route.page === 'books'
+                        ? <Books />
                       : route.page === 'policy'
-                        ? <Policy />
+                        ? (
+                          <div {...stylex.props(styles.policyStack)}>
+                            <Policy />
+                            <Control />
+                          </div>
+                        )
                         : (
                           <div {...stylex.props(styles.state)} role="status">
                             <p {...stylex.props(styles.stateTitle)}>Page not found</p>

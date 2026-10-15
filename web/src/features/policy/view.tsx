@@ -4,7 +4,7 @@ import { tokens } from '../../tokens/tokens.stylex'
 const clauses = [
   { id: 'P1', text: 'Bill only from a client message that contains an explicit commitment ("let\'s do", "go ahead", "order", a quantity).' },
   { id: 'P2', text: 'Prices come from the rate card only. Lead list £4/lead, setup £0.' },
-  { id: 'P3', text: 'Discounts only if remembered as agreed (Cognee fact with date) and never above 15%.' },
+  { id: 'P3', text: 'Discounts only if remembered as agreed (a remembered fact with a date) and never above 15%.' },
   { id: 'P4', text: 'Auto-send invoices up to £1,000. Above that, one approval from the account owner.' },
   { id: 'P5', text: 'Known clients only (Stripe customer exists or is in the client list). Unknown → ask, do not bill.' },
   { id: 'P6', text: 'One invoice per commitment message (idempotency).' },

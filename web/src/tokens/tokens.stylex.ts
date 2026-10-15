@@ -35,7 +35,7 @@ export const tokens = stylex.defineVars({
   weightBold: '400',
   fontSans: "Amiamie, Inter, ui-sans-serif, system-ui, sans-serif",
   fontMono: "'Geist Mono', ui-monospace, SFMono-Regular, monospace",
-  fontRegular: '400',
+  weightNormal: '400',
   textNav: '13px',
   textPageTitle: '28px',
   radiusShell: '20px',
