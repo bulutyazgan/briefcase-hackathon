@@ -223,11 +223,11 @@ async function continueBilling(message: ChannelMessage, saved: SavedDecision): P
 
     try {
       await rememberFact(intent.clientName, `${new Date().toISOString().slice(0, 10)}: invoiced ${intent.ask}`)
-      recordStep(message.id, 'remember', 'Saved the client commitment to Cognee memory.', {
+      recordStep(message.id, 'remember', 'Saved the client commitment to client memory.', {
         clientName: intent.clientName,
       })
     } catch (error) {
-      recordStep(message.id, 'remember', 'Cognee memory write failed.', { error: String(error) })
+      recordStep(message.id, 'remember', 'Client memory write failed.', { error: String(error) })
     }
 
     const pdfUrl = pdfPath ? `/api/invoices/${message.id}/pdf` : 'PDF unavailable'
@@ -357,7 +357,7 @@ async function processMessage(message: ChannelMessage): Promise<void> {
     try {
       facts = await recallFacts(intent.clientName, intent.ask)
     } catch (error) {
-      recordStep(message.id, 'recall', 'Cognee recall failed; using the seeded memory facts.', { error: String(error) })
+      recordStep(message.id, 'recall', 'Live memory recall failed; using the seeded memory facts.', { error: String(error) })
       facts = await recallSeededFacts(intent.clientName)
     }
     recordStep(message.id, 'recall', `Recalled ${facts.length} client memory facts.`, { facts })

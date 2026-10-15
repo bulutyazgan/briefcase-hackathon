@@ -272,6 +272,15 @@ export function listApprovals(): ApprovalRow[] {
   return database.query<ApprovalRow, []>('SELECT * FROM approvals ORDER BY rowid DESC').all()
 }
 
+// The simulator composer has no thread picker: a new message from an author continues their latest thread,
+// so "Why £1,080?" and a dispute resolve against the invoice they are about.
+export function getLatestThreadForAuthor(channel: string, author: string): string | null {
+  const row = database.query<{ thread: string }, [string, string]>(
+    'SELECT thread FROM messages WHERE channel = ? AND author = ? ORDER BY ts DESC LIMIT 1',
+  ).get(channel, author)
+  return row?.thread ?? null
+}
+
 export function getLatestInvoiceForThread(thread: string): InvoiceRow | null {
   return database.query<InvoiceRow, [string]>(`
     SELECT invoices.* FROM invoices
