@@ -3,9 +3,9 @@ import { listEventsByStep, recordEvent } from '../ledger/store'
 import { searchCogneeDataset, storeInCogneeDataset } from '../memory/memory'
 
 const COMPANY_NAME = 'Brightline Studio'
-const COMPANY_DATASET = 'company'
+export const COMPANY_DATASET = 'company-profile'
 const COMPANY_MARKDOWN = new URL('../../../seed/company.md', import.meta.url)
-const LEARN_SUMMARY = 'Learned Brightline Studio into Cognee (dataset company).'
+const LEARN_SUMMARY = 'Learned Brightline Studio into Cognee (dataset company-profile).'
 
 type LearnResult = { stored: 'cognee' | 'file' }
 

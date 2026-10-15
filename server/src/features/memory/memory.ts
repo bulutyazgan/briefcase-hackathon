@@ -25,6 +25,7 @@ export interface MemoryOptions {
 }
 
 const roleSchema = z.enum(memoryRoles)
+const UUID_PATTERN = /^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/i
 const seededFactsSchema = z.array(z.object({
   clientName: z.string(),
   fact: z.string(),
@@ -138,10 +139,22 @@ export async function searchCogneeDataset(
 ): Promise<string[] | null> {
   const cognee = resolveCognee({})
   if (!cognee) return null
-  return cognee.search(dataset, query, {
-    topK: options.topK ?? 20,
+  const topK = Math.min(5, options.topK ?? 5)
+  const hits = await cognee.search(dataset, query, {
+    topK,
     signal: AbortSignal.timeout(options.timeoutMs ?? 4000),
   })
+  const seen = new Set<string>()
+  const filtered: string[] = []
+  for (const rawHit of hits) {
+    const hit = rawHit.trim()
+    const key = hit.replace(/\s+/g, ' ').toLowerCase()
+    if (hit.length < 40 || UUID_PATTERN.test(hit) || seen.has(key)) continue
+    seen.add(key)
+    filtered.push(hit)
+    if (filtered.length >= topK) break
+  }
+  return filtered
 }
 
 export async function seedClientMemoryToCognee(clientName: string): Promise<boolean> {

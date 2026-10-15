@@ -10,8 +10,8 @@
 //                              response: any 2xx (body ignored); kept for datasets added another way
 // POST {base}/api/v1/search    JSON { "query": "...", "searchType": "CHUNKS",
 //                                     "datasets": ["<client-slug>"], "topK": 20 }
-//                              response: any JSON; every string leaf is scanned for
-//                              tagged facts "[date=YYYY-MM-DD role=<role> source=<id> client=<slug>] text".
+//                              response: any JSON; text and content fields hold
+//                              the searchable result strings.
 //                              e.g. [{ "search_result": ["[date=... ] Pays on 7-day terms"] }]
 // Non-2xx responses throw.
 
@@ -46,6 +46,20 @@ export function collectStrings(value: unknown): string[] {
   if (Array.isArray(value)) return value.flatMap(collectStrings)
   if (value !== null && typeof value === 'object') return Object.values(value).flatMap(collectStrings)
   return []
+}
+
+function collectSearchText(value: unknown, allowStrings = false): string[] {
+  if (typeof value === 'string') return allowStrings ? [value] : []
+  if (Array.isArray(value)) return value.flatMap((entry) => collectSearchText(entry, allowStrings))
+  if (value === null || typeof value !== 'object') return []
+  const entries = Object.entries(value)
+  const resultText = entries.find(([key, entry]) =>
+    (key === 'text' || key === 'content') && typeof entry === 'string',
+  )?.[1]
+  if (typeof resultText === 'string') return [resultText]
+  return entries.flatMap(([key, entry]) =>
+    collectSearchText(entry, key === 'search_result' || key === 'search_results' || key === 'results'),
+  )
 }
 
 export function createCogneeClient(config: CogneeConfig): CogneeClient {
@@ -85,7 +99,7 @@ export function createCogneeClient(config: CogneeConfig): CogneeClient {
         body: JSON.stringify({ query, searchType: 'CHUNKS', datasets: [dataset], topK: options.topK ?? 20 }),
         signal: options.signal,
       })
-      return collectStrings(await response.json())
+      return collectSearchText(await response.json())
     },
   }
 }
