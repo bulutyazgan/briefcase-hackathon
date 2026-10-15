@@ -40,7 +40,10 @@ function DemoDialog({ onClose }: { onClose: () => void }) {
           <Text role="heading16">From a client message to a paid invoice, in 78 seconds</Text>
           <Button variant="secondary" onClick={onClose}>Close</Button>
         </div>
-        <video {...stylex.props(styles.demoVideo)} src="/demo/tally-demo.mp4" poster="/demo/tally-demo-poster.png" controls autoPlay playsInline />
+        <video {...stylex.props(styles.demoVideo)} poster="/demo/tally-demo-poster.png" controls autoPlay playsInline>
+          <source src="/demo/tally-demo.webm" type="video/webm" />
+          <source src="/demo/tally-demo.mp4" type="video/mp4" />
+        </video>
       </div>
     </div>
   )
