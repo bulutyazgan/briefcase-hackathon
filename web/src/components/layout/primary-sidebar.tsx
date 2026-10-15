@@ -34,7 +34,7 @@ export function PrimarySidebar({ path, invoiceCount, pendingCount, leadsCount, n
     <>
       <div {...stylex.props(iconStyles.brandHeader)}>
         <Link to="/app/inbox" {...stylex.props(styles.brand)}><TallyLogo size={20} />Tally</Link>
-        {readOnly ? <span role="status" {...stylex.props(content.tag, iconStyles.readOnly)}>Read-only demo · recorded run</span> : null}
+        {readOnly ? <span role="status" {...stylex.props(content.tag, iconStyles.readOnly)}>Read-only demo</span> : null}
       </div>
       <nav aria-label="Main navigation" {...stylex.props(styles.nav)}>
         {items.map((item) => {
