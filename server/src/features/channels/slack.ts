@@ -29,6 +29,12 @@ export async function startSlack(): Promise<void> {
   console.info('Slack Socket Mode is connected.')
 }
 
+// Outbound post to a channel that is not a client thread (the staff channel). No-op until Slack is connected.
+export async function postSlackText(channel: string, text: string): Promise<void> {
+  if (!slackApp) return
+  await slackApp.client.chat.postMessage({ channel, text })
+}
+
 export async function sendSlackMessage(
   message: ChannelMessage,
   text: string,

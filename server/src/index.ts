@@ -31,6 +31,7 @@ import { companyStatus, learnCompany } from './features/company/company'
 import { seedClientMemoryToCognee } from './features/memory/memory'
 import { seedCompanyKnowledge } from './features/memory/company'
 import { listClients } from './features/ledger/store'
+import { staffRoutes } from './features/staff/routes'
 
 const leadSchema = z.object({
   name: z.string(),
@@ -75,7 +76,7 @@ app.get('/api/control', (context) => context.json(controlStatus()))
 app.route('/api/books', booksRoutes)
 app.get('/api/opportunities', (context) => context.json({ opportunities: listOpportunityViews() }))
 app.get('/api/clients', (context) => context.json({ clients: listClients() }))
-app.get('/api/clients', (context) => context.json({ clients: listClients() }))
+app.route('/api/staff', staffRoutes)
 
 app.get('/api/leads', (context) => {
   const leads = listInvoices().flatMap((invoice) => {
