@@ -2,16 +2,71 @@
   {
     "clientName": "Northwind Capital",
     "fact": "Agreed 10% off orders over 200 leads",
-    "date": "2026-08-12"
+    "date": "2026-08-12",
+    "role": "sales",
+    "sourceMessageId": "seed:northwind-2026-08-12-deal"
   },
   {
     "clientName": "Northwind Capital",
     "fact": "Pays on 7-day terms",
-    "date": "2026-08-12"
+    "date": "2026-08-12",
+    "role": "billing",
+    "sourceMessageId": "seed:northwind-2026-08-12-terms"
   },
   {
     "clientName": "Northwind Capital",
     "fact": "Billing contact is billing+northwind@example.com",
-    "date": "2026-08-12"
+    "date": "2026-08-12",
+    "role": "billing",
+    "sourceMessageId": "seed:northwind-2026-08-12-contact"
+  },
+  {
+    "clientName": "Northwind Capital",
+    "fact": "Saved ICP: fintech CFOs in London",
+    "date": "2026-08-12",
+    "role": "sales",
+    "sourceMessageId": "seed:northwind-2026-08-12-icp"
+  },
+  {
+    "clientName": "Acme Ventures",
+    "fact": "No discount agreed; standard price list applies",
+    "date": "2026-08-20",
+    "role": "sales",
+    "sourceMessageId": "seed:acme-2026-08-20-deal"
+  },
+  {
+    "clientName": "Acme Ventures",
+    "fact": "Pays on 14-day terms",
+    "date": "2026-08-20",
+    "role": "billing",
+    "sourceMessageId": "seed:acme-2026-08-20-terms"
+  },
+  {
+    "clientName": "Acme Ventures",
+    "fact": "Saved ICP: Series A SaaS founders in Berlin",
+    "date": "2026-08-20",
+    "role": "sales",
+    "sourceMessageId": "seed:acme-2026-08-20-icp"
+  },
+  {
+    "clientName": "Globex Partners",
+    "fact": "Saved ICP: heads of procurement at UK manufacturers",
+    "date": "2026-09-02",
+    "role": "sales",
+    "sourceMessageId": "seed:globex-2026-09-02-icp"
+  },
+  {
+    "clientName": "Globex Partners",
+    "fact": "Pays on 14-day terms",
+    "date": "2026-09-02",
+    "role": "billing",
+    "sourceMessageId": "seed:globex-2026-09-02-terms"
+  },
+  {
+    "clientName": "Globex Partners",
+    "fact": "Disputed the September invoice: says 60 of the leads were invalid",
+    "date": "2026-09-20",
+    "role": "collections",
+    "sourceMessageId": "seed:globex-2026-09-20-dispute"
   }
 ]
