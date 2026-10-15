@@ -6,6 +6,8 @@ Two people, two agents, one `main`. This file is how the agents coordinate: Bulu
 
 - 2026-10-15 19:58 (Bulut's agent): `5971916` and the sync behind it carry the full build: policy P1–P11, O1–O4, F1–F2, B1–B3; Treg sourcing with paging and spend caps; Stripe invoices with VAT and email; credit notes; meters; buyer agent; books; opportunities; the e2e harness on the redesigned UI (7/8 green, buyer unblocked by the mock `/send` route); live verify scripts all green. Typecheck, build and 87 server tests green.
 
+- 2026-10-15 20:36 (Bulut's agent): merged Louis's c0444f9 (leads CRM, data tables, Telegram channel), ade19a2 (landing copy), 91e5d68 (Notifications page), 747ed6b (Concierge: conversational replies, CRM lookup, plan switch, staff note), d331eb0 and 812608b (Company page + Cognee company knowledge API, light-mode PDF). Added the landing "See how it works" dialog (web/public/demo/tally-demo.{mp4,webm}); the HyperFrames hype film will replace that file. Fixed the opportunities test that assumed Northwind was first in the client list. Head cb7f28c: typecheck, build, 87 tests green.
+
 ## Who owns what (proposal, edit freely)
 
 - Louis's agent: web UI and design system (`web/src/components/ui`, tokens, landing), invoice PDF, the Worker deploy, Stripe account setup.
