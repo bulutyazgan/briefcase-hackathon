@@ -38,7 +38,7 @@ export function money(pence: number): string {
 }
 
 function isKind(value: unknown): value is StaffNoteKind {
-  return typeof value === 'string' && (staffNoteKinds as readonly string[]).includes(value)
+  return typeof value === 'string' && staffNoteKinds.some((kind) => kind === value)
 }
 
 function noteFromEvent(event: EventRow): StaffNote {
