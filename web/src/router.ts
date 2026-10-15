@@ -7,6 +7,17 @@ import {
 
 const navigationEvent = 'tally:navigation'
 
+function scrollToFragment(hash: string): void {
+  if (!hash) return
+  let id = hash.slice(1)
+  try {
+    id = decodeURIComponent(id)
+  } catch {
+    id = hash.slice(1)
+  }
+  window.setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 0)
+}
+
 function currentPath(): string {
   return window.location.pathname
 }
@@ -33,10 +44,14 @@ export function navigate(to: string): void {
 
   const nextPath = `${destination.pathname}${destination.search}${destination.hash}`
   const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`
-  if (nextPath === currentUrl) return
+  if (nextPath === currentUrl) {
+    scrollToFragment(destination.hash)
+    return
+  }
 
   window.history.pushState(null, '', nextPath)
   window.dispatchEvent(new Event(navigationEvent))
+  scrollToFragment(destination.hash)
 }
 
 interface LinkProps extends Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'href'> {

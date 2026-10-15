@@ -8,6 +8,8 @@
   },
   "dependencies": {
     "@stylexjs/stylex": "0.19.1",
+    "lucide-react": "^1.57.0",
+    "motion": "^14.3.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },

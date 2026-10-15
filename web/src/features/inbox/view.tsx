@@ -1,56 +1,130 @@
-import { useState, type FormEvent } from 'react'
+import { useState } from 'react'
+import type { FormEvent } from 'react'
 import * as stylex from '@stylexjs/stylex'
 import type { AppState, ApprovalRow, ChannelMessage } from '../../api'
-import { formatMoneyText } from '../../format'
+import { Button } from '../../components/ui/button'
+import { InlineCitations } from '../../components/ui/inline-citations'
+import { Page, Opening, Section } from '../../components/ui/page'
+import { RowList, RowListItem } from '../../components/ui/row-list'
+import { StatStrip } from '../../components/ui/stat-strip'
+import { Text } from '../../components/ui/text'
+import { TextResponse } from '../../components/ui/text-response'
+import { ThinkingReasoning } from '../../components/ui/thinking-reasoning'
+import { ThinkingState } from '../../components/ui/thinking-state'
+import { content } from '../../components/ui/content.stylex'
+import { Link } from '../../router'
+import { evidenceFromEvent } from '../invoices/api'
 import { decideApproval, sendMessage } from './api'
-import { styles } from './inbox.stylex'
 
-const authors = [
-  'Client — Northwind',
-  'Client — Acme',
-  'Client — Globex',
-  'Account owner',
-  'Unknown sender',
-] as const
-
-interface InboxProps {
-  state: AppState
-  onRefresh: () => void
+function money(pence: number): string {
+  return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(pence / 100)
 }
 
-function displayTime(timestamp: string): string {
-  return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+function reasonAmount(reason: string): number {
+  const match = reason.match(/£\s*([\d,]+(?:\.\d{1,2})?)/)
+  return match ? Math.round(Number.parseFloat(match[1].replaceAll(',', '')) * 100) : 0
 }
 
-function Message({ message }: { message: ChannelMessage }) {
+function isTally(message: ChannelMessage): boolean {
+  return message.author.toLowerCase() === 'tally'
+}
+
+function messageEvents(state: AppState, message: ChannelMessage) {
+  return state.events
+    .filter((event) => event.message_id === message.id || event.message_id === message.thread)
+    .sort((left, right) => left.created_at.localeCompare(right.created_at))
+}
+
+function stepName(step: string): string | null {
+  if (step === 'extract') return 'extract'
+  if (step === 'recall') return 'recall'
+  if (step === 'size' || step === 'leads' || step === 'lead_sizing' || step === 'source_leads') return 'source leads'
+  if (step === 'price') return 'price'
+  if (step === 'decide' || step === 'policy') return 'policy'
+  if (step === 'billing' || step === 'bill') return 'bill'
+  return null
+}
+
+function AgentReasoning({ state, message }: { state: AppState; message: ChannelMessage }) {
+  const events = messageEvents(state, message)
+  const order = ['extract', 'recall', 'source leads', 'price', 'policy', 'bill']
+  const steps = order.flatMap((name) => {
+    const matches = events.filter((event) => stepName(event.step) === name)
+    return matches.length ? [{ name, detail: matches.map((event) => event.summary).join(' · ') }] : []
+  })
+  if (!steps.length) return null
+  const start = Date.parse(events[0].created_at)
+  const end = Date.parse(events[events.length - 1].created_at)
+  return <ThinkingReasoning seconds={Math.max(1, Math.round((end - start) / 1000))} steps={steps} />
+}
+
+function AgentCitations({ state, message }: { state: AppState; message: ChannelMessage }) {
+  const invoice = state.invoices.find((item) => item.message_id === message.thread || item.message_id === message.id)
+  if (!invoice) return null
+  const evidenceEvent = state.events.find((item) => item.message_id === invoice.message_id && evidenceFromEvent(item).length > 0)
+  const evidence = evidenceFromEvent(evidenceEvent)[0]
+  if (!evidence) return null
+  const path = `/app/invoices/${encodeURIComponent(invoice.id)}`
+  return <InlineCitations citations={[
+    { label: `invoice amount ${money(invoice.total_pence)}`, href: `${path}#invoice-amount` },
+    { label: 'client quote', href: `${path}#evidence-quote` },
+    { label: 'memory fact', href: `${path}#evidence-memory` },
+    ...evidence.clauses.map((clause) => ({ label: `policy ${clause}`, href: `${path}#policy-${clause}` })),
+  ]} />
+}
+
+function MessageBubble({ state, message }: { state: AppState; message: ChannelMessage }) {
+  const tally = isTally(message)
   return (
-    <article {...stylex.props(styles.message, message.author === 'tally' && styles.tallyMessage)}>
-      <div {...stylex.props(styles.messageMeta)}>
-        <strong>{message.author}</strong>
-        <time dateTime={message.ts} {...stylex.props(styles.timestamp)}>{displayTime(message.ts)}</time>
+    <article {...stylex.props(content.message, tally ? content.agentMessage : content.clientMessage)}>
+      <div {...stylex.props(content.messageTop)}>
+        <Text role="label">{message.author}</Text>
+        <span {...stylex.props(content.timestamp)}>{new Date(message.ts).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' })}</span>
       </div>
-      <p {...stylex.props(styles.messageText)}>{formatMoneyText(message.text)}</p>
+      {tally
+        ? <><TextResponse>{message.text}</TextResponse><AgentCitations state={state} message={message} /><AgentReasoning state={state} message={message} /></>
+        : <Text role="compact">{message.text}</Text>}
     </article>
   )
 }
 
-export function Inbox({ state, onRefresh }: InboxProps) {
-  const [author, setAuthor] = useState<string>(authors[0])
-  const [text, setText] = useState('')
-  const [error, setError] = useState('')
-  const [busy, setBusy] = useState(false)
-  const messages = [...state.messages]
-    .filter((message) => message.channel === 'simulator')
-    .sort((first, second) => first.ts.localeCompare(second.ts))
+function ApprovalItem({ approval, busy, onDecide }: { approval: ApprovalRow; busy: boolean; onDecide: (id: string, action: 'approve' | 'reject') => void }) {
+  return (
+    <RowListItem id={approval.id}>
+      <div {...stylex.props(content.stack, content.full)}>
+        <div {...stylex.props(content.row)}><Text role="heading16">Approval needed</Text><span {...stylex.props(content.id)}>{approval.message_id.slice(0, 8)}</span></div>
+        <Text role="compact">{approval.reason}</Text>
+        <div {...stylex.props(content.approvalActions)}>
+          <Button variant="primary" disabled={busy} onClick={() => onDecide(approval.message_id, 'approve')}>Approve invoice</Button>
+          <Button disabled={busy} onClick={() => onDecide(approval.message_id, 'reject')}>Reject</Button>
+        </div>
+      </div>
+    </RowListItem>
+  )
+}
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
+export function Inbox({ state, onRefresh }: { state: AppState; onRefresh: () => void }) {
+  const [author, setAuthor] = useState('Client — Northwind')
+  const [messageText, setMessageText] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [busyApproval, setBusyApproval] = useState('')
+  const [error, setError] = useState('')
+  const pending = state.approvals.filter((approval) => approval.status === 'pending')
+  const thread = state.messages.slice(-40)
+  const outstanding = state.invoices.filter((invoice) => invoice.status !== 'paid').reduce((total, invoice) => total + invoice.total_pence, 0)
+  const pendingAmount = pending.map((approval) => reasonAmount(approval.reason)).find((amount) => amount > 0) || outstanding
+  const title = pending.length
+    ? pendingAmount > 0 ? `${money(pendingAmount)} awaiting your approval` : `${pending.length} approval${pending.length === 1 ? '' : 's'} waiting for review`
+    : state.invoices.length ? `${state.invoices.length} invoice${state.invoices.length === 1 ? '' : 's'} in the ledger` : 'Your client commitments are in one place'
+
+  async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault()
-    if (!text.trim() || busy) return
+    if (!messageText.trim() || busy) return
     setBusy(true)
     setError('')
     try {
-      await sendMessage(author, text.trim())
-      setText('')
+      await sendMessage(author, messageText.trim())
+      setMessageText('')
       onRefresh()
     } catch (sendError) {
       setError(String(sendError))
@@ -59,128 +133,55 @@ export function Inbox({ state, onRefresh }: InboxProps) {
     }
   }
 
-  return (
-    <section {...stylex.props(styles.panel)} aria-labelledby="inbox-title">
-      <header {...stylex.props(styles.header)}>
-        <div>
-          <h2 id="inbox-title" {...stylex.props(styles.title)}>Client channel</h2>
-          <p {...stylex.props(styles.caption)}>Simulator · Northwind Capital</p>
-        </div>
-        <span aria-label="Agent status" {...stylex.props(styles.live)}>
-          <span aria-hidden="true" {...stylex.props(styles.liveDot)} />
-          Live
-        </span>
-      </header>
-      <div {...stylex.props(styles.feed)} aria-live="polite">
-        {messages.length
-          ? messages.map((message) => <Message key={message.id} message={message} />)
-          : <p {...stylex.props(styles.empty)}>No messages yet. Send a client commitment to start the audit trail.</p>}
-      </div>
-      <form {...stylex.props(styles.composer)} onSubmit={submit}>
-        <select
-          id="message-author"
-          aria-label="Send as"
-          value={author}
-          onChange={(event) => setAuthor(event.target.value)}
-          {...stylex.props(styles.input)}
-        >
-          {authors.map((name) => <option key={name}>{name}</option>)}
-        </select>
-        <input
-          id="message-text"
-          aria-label="Message"
-          value={text}
-          onChange={(event) => setText(event.target.value)}
-          placeholder="Write a client message…"
-          {...stylex.props(styles.input)}
-        />
-        <button type="submit" {...stylex.props(styles.button)} disabled={busy || !text.trim()}>
-          Send
-        </button>
-        {error && <p role="alert" {...stylex.props(styles.error)}>{error}</p>}
-      </form>
-    </section>
-  )
-}
-
-function ApprovalCard({
-  approval,
-  busy,
-  onDecide,
-}: {
-  approval: ApprovalRow
-  busy: boolean
-  onDecide: (messageId: string, action: 'approve' | 'reject') => void
-}) {
-  return (
-    <article {...stylex.props(styles.approval)}>
-      <div {...stylex.props(styles.approvalTopline)}>
-        <strong {...stylex.props(styles.approvalTitle)}>Approval needed</strong>
-        <span {...stylex.props(styles.approvalId)}>{approval.message_id.slice(0, 8)}</span>
-      </div>
-      <p {...stylex.props(styles.approvalReason)}>{formatMoneyText(approval.reason)}</p>
-      <div {...stylex.props(styles.approvalActions)}>
-        <button
-          type="button"
-          {...stylex.props(styles.approve)}
-          disabled={busy}
-          onClick={() => onDecide(approval.message_id, 'approve')}
-        >
-          Approve invoice
-        </button>
-        <button
-          type="button"
-          {...stylex.props(styles.reject)}
-          disabled={busy}
-          onClick={() => onDecide(approval.message_id, 'reject')}
-        >
-          Reject
-        </button>
-      </div>
-    </article>
-  )
-}
-
-export function PendingApprovals({ state, onRefresh }: InboxProps) {
-  const [approvalBusy, setApprovalBusy] = useState('')
-  const [error, setError] = useState('')
-  const pendingApprovals = state.approvals.filter((approval) => approval.status === 'pending')
-
-  async function decide(messageId: string, action: 'approve' | 'reject'): Promise<void> {
-    setApprovalBusy(messageId)
+  async function decide(id: string, action: 'approve' | 'reject'): Promise<void> {
+    setBusyApproval(id)
     setError('')
     try {
-      await decideApproval(messageId, action)
+      await decideApproval(id, action)
       onRefresh()
-    } catch (approvalError) {
-      setError(String(approvalError))
+    } catch (decisionError) {
+      setError(String(decisionError))
     } finally {
-      setApprovalBusy('')
+      setBusyApproval('')
     }
   }
 
   return (
-    <section {...stylex.props(styles.approvalPanel)} aria-labelledby="pending-approvals-title">
-      <header {...stylex.props(styles.approvalHeader)}>
-        <div>
-          <h2 id="pending-approvals-title" {...stylex.props(styles.title)}>Pending approvals</h2>
-          <p {...stylex.props(styles.caption)}>Review before billing</p>
-        </div>
-        <span {...stylex.props(styles.approvalCount)}>{pendingApprovals.length}</span>
-      </header>
-      <div {...stylex.props(styles.approvalList)}>
-        {pendingApprovals.length
-          ? pendingApprovals.map((approval) => (
-            <ApprovalCard
-              key={approval.id}
-              approval={approval}
-              busy={approvalBusy === approval.message_id}
-              onDecide={(messageId, action) => void decide(messageId, action)}
-            />
-          ))
-          : <p {...stylex.props(styles.emptyApproval)}>No approvals are waiting. New requests will appear here.</p>}
-        {error && <p role="alert" {...stylex.props(styles.error)}>{error}</p>}
+    <Page>
+      <Opening title={title} lede="Commitments, approvals and billing evidence stay together." tools={<Link to="/app/invoices" {...stylex.props(content.link)}>View invoices</Link>} />
+      <StatStrip items={[
+        { label: 'Messages', value: state.messages.length, mono: true },
+        { label: 'Approvals waiting', value: pending.length, mono: true },
+        { label: 'Outstanding', value: money(outstanding), mono: true },
+      ]} />
+      <div {...stylex.props(content.twoCol)}>
+        <Section title="Client channel" description="Simulator thread and agent responses">
+          <div {...stylex.props(content.card, content.stack)}>
+            <div {...stylex.props(content.row)}><Text role="label">{thread[thread.length - 1]?.channel || 'Simulator channel'}</Text><span {...stylex.props(content.tag)}>Live updates</span></div>
+            <div {...stylex.props(content.thread)} aria-live="polite">
+              {thread.length
+                ? thread.map((message) => <MessageBubble key={message.id} state={state} message={message} />)
+                : <Text role="compact">Send a client commitment to start the thread.</Text>}
+              {state.messages.filter((message) => !isTally(message) && message.processed_at === null).map((message) => <div key={`thinking-${message.id}`} {...stylex.props(content.message, content.agentMessage)}><ThinkingState /></div>)}
+            </div>
+            <form onSubmit={(event) => void submit(event)} {...stylex.props(content.composer)}>
+              <select aria-label="Send as" value={author} onChange={(event) => setAuthor(event.target.value)} {...stylex.props(content.input)}>
+                <option>Client — Northwind</option><option>Account owner</option>
+              </select>
+              <input aria-label="Message" value={messageText} onChange={(event) => setMessageText(event.target.value)} placeholder="Write a client message" {...stylex.props(content.input)} />
+              <Button variant="primary" type="submit" disabled={busy || !messageText.trim()}>{busy ? 'Sending' : 'Send'}</Button>
+              {error ? <p role="alert" {...stylex.props(content.formError)}>{error}</p> : null}
+            </form>
+          </div>
+        </Section>
+        <Section title="Pending approvals" description="Review before billing">
+          <div {...stylex.props(content.card)}>
+            {pending.length
+              ? <RowList>{pending.map((approval) => <ApprovalItem key={approval.id} approval={approval} busy={busyApproval === approval.message_id} onDecide={(id, action) => void decide(id, action)} />)}</RowList>
+              : <Text role="compact">No approvals are waiting. New requests will appear here.</Text>}
+          </div>
+        </Section>
       </div>
-    </section>
+    </Page>
   )
 }
