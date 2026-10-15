@@ -38,7 +38,7 @@ channels (simulator | Slack Socket Mode | email)        web (Vite + React + Styl
         │  normalized ChannelMessage                       │ inbox, invoices, policy, audit
         ▼                                                  ▼
 server (Hono on Bun) ── agent loop ─────────────────────────────────────────────
-   1 extract   LLM (Fireworks, AI SDK) → typed BillableIntent {client, ask, icp, qty?, quote}
+   1 extract   LLM (OpenAI, AI SDK) → typed BillableIntent {client, ask, icp, qty?, quote}
    2 recall    memory (Cognee) → facts about this client (rates, discounts, promises, disputes)
    3 size      leads (Firecrawl) → lead list + count
    4 price     code: rate card × qty − allowed discount
@@ -73,8 +73,8 @@ Lives in `server/policy/billing-policy.md` (human-readable, shown in the UI) and
 
 | Concern | Choice | Why |
 | --- | --- | --- |
-| Web | Vite + React 19 + TypeScript + StyleX (no Tailwind) | Louis's call; cf0 house style |
-| Server | Hono on Bun, `bun:sqlite` | Zero setup, one process, fast |
+| Web | Vite + React 19 + TypeScript + StyleX (no Tailwind) | Finance-focused visual system |
+| Server | Hono on Bun, `bun:sqlite` | No extra services, one process, fast |
 | Agent | AI SDK + OpenAI model, tool loop with zod schemas | Key already available; typed extraction |
 | Memory | Cognee Cloud HTTP API (`/api/v1/add`, `/cognify`, `/search`, `X-Api-Key`) — one dataset per client. Local fallback store if no key | Sponsor stack + side quest |
 | Billing | Stripe test mode (`sk_test_…`): customers, invoice items, invoices, hosted invoice page | Track requirement |

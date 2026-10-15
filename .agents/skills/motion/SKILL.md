@@ -5,12 +5,12 @@ description: >
 argument-hint: "[subcommand or question, e.g. 'audit src/Modal.tsx', 'spring bounce 0.3', 'upgrade', 'how do I animate a list']"
 ---
 
-# Must Read
-Get the mirrored 1:1 documentation of motion.dev from the mirror repo (single source of truth):
+# Documentation
 
-- SOT: `git@github.com:cf0-enterprise/motion.git` (legacy: `git@github.com:cf0-corp/motion.git`)
-- If a local clone already exists, use it (check `~/Programming/*/motion`, `~/Cursor/cf0/motion` or ask the user); otherwise `git clone git@github.com:cf0-enterprise/motion.git`
-- Docs live under `mirror/` in the clone (docs, examples, magazine, troubleshooting). Refresh with `./sync.sh` inside the clone.
+Use the official Motion documentation at https://motion.dev/docs and the
+references in this skill. Check the installed package version before applying
+version-specific advice. Do not assume that an optional MCP server is
+available.
 
 # Motion
 
@@ -66,4 +66,3 @@ rest is tiered, and the tools say so when you reach them:
 directly. Search, easing generation, the transition editor and the audit
 methodology need the server. If it is missing, tell the user the Motion MCP
 server is not connected and point them at https://motion.dev/docs/ai-kit.
-
