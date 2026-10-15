@@ -18,6 +18,7 @@ export const content = stylex.create({
   author: { color: color.ink, fontFamily: text.fontSans, fontSize: text.label, fontWeight: weight.medium, lineHeight: '20px' },
   timestamp: { color: color.ink3, fontFamily: text.fontMono, fontSize: text.label, fontVariantNumeric: 'tabular-nums', lineHeight: '16px' },
   composer: { borderTopColor: color.hairline, borderTopStyle: 'solid', borderTopWidth: '1px', display: 'grid', gap: space.sm, gridTemplateColumns: '180px minmax(0, 1fr) auto', paddingBlockStart: space.md, '@media (max-width: 700px)': { gridTemplateColumns: '1fr' } },
+  replayBar: { alignItems: 'center', borderTopColor: color.hairline, borderTopStyle: 'solid', borderTopWidth: '1px', display: 'flex', flexWrap: 'wrap', gap: space.md, justifyContent: 'space-between', paddingBlockStart: space.md },
   input: { backgroundColor: color.canvas, borderColor: color.hairlineStrong, borderRadius: radius.control, borderStyle: 'solid', borderWidth: '1px', color: color.ink, fontFamily: text.fontSans, fontSize: text.compact, minHeight: '40px', minWidth: 0, paddingBlock: space.xs, paddingInline: space.sm, width: '100%', ':focus-visible': { outlineColor: color.focus, outlineOffset: '2px', outlineStyle: 'solid', outlineWidth: '2px' } },
   approval: { borderBottomColor: color.hairline, borderBottomStyle: 'solid', borderBottomWidth: '1px', display: 'flex', flexDirection: 'column', gap: space.sm, paddingBlock: space.md },
   approvalActions: { display: 'flex', flexWrap: 'wrap', gap: space.xs },

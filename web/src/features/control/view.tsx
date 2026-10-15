@@ -31,7 +31,7 @@ export function Control() {
               </div>
             </div>
             <Text role="body">Even a prompt-injected agent cannot refund, pay out or create charges.</Text>
-            <Text role="compact">Send /pause in any channel to stop billing and sourcing. Only the account owner can /resume.</Text>
+            <Text role="compact">{status.readOnly ? 'This hosted demo is read-only and replays recorded activity.' : 'Send /pause in any channel to stop billing and sourcing. Only the account owner can /resume.'}</Text>
           </>
         ) : null}
       </div>

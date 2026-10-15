@@ -1,10 +1,12 @@
 import type { EventRow } from '../../api'
+import { isReadOnlyMode } from '../../app-state'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
 
 export async function simulateInvoicePayment(invoiceId: string): Promise<void> {
+  if (isReadOnlyMode()) throw new Error('This demo is read-only.')
   const response = await fetch(`/api/invoices/${encodeURIComponent(invoiceId)}/simulate-payment`, {
     method: 'POST',
   })

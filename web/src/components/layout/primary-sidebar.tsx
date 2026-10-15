@@ -2,6 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Activity01Icon, Building03Icon, InboxIcon, Invoice01Icon, Notification01Icon, Shield01Icon, UserGroupIcon } from '@hugeicons/core-free-icons'
 import { space } from '../../tokens/tokens.stylex'
+import { content } from '../ui/content.stylex'
 import { TallyLogo } from '../ui/tally-logo'
 import { Link } from '../../router'
 import { styles } from './app-shell.stylex'
@@ -19,13 +20,18 @@ const items = [
 const iconStyles = stylex.create({
   pair: { alignItems: 'center', display: 'inline-flex', gap: space.sm, lineHeight: 'inherit' },
   icon: { flexShrink: 0 },
+  brandHeader: { alignItems: 'flex-start', display: 'flex', flexDirection: 'column', gap: space.xs, minWidth: 0 },
+  readOnly: { lineHeight: '16px', maxWidth: '100%', whiteSpace: 'normal' },
 })
 
-export function PrimarySidebar({ path, invoiceCount, pendingCount, leadsCount, notificationCount }: { path: string; invoiceCount: number; pendingCount: number; leadsCount: number; notificationCount: number }) {
+export function PrimarySidebar({ path, invoiceCount, pendingCount, leadsCount, notificationCount, readOnly }: { path: string; invoiceCount: number; pendingCount: number; leadsCount: number; notificationCount: number; readOnly: boolean }) {
   const active = path.startsWith('/app/invoices') ? 'invoices' : path.split('/')[2]
   return (
     <>
-      <Link to="/app/inbox" {...stylex.props(styles.brand)}><TallyLogo size={20} />Tally</Link>
+      <div {...stylex.props(iconStyles.brandHeader)}>
+        <Link to="/app/inbox" {...stylex.props(styles.brand)}><TallyLogo size={20} />Tally</Link>
+        {readOnly ? <span role="status" {...stylex.props(content.tag, iconStyles.readOnly)}>Read-only demo · recorded run</span> : null}
+      </div>
       <nav aria-label="Main navigation" {...stylex.props(styles.nav)}>
         {items.map((item) => {
           const count = item.key === 'inbox' ? pendingCount : item.key === 'invoices' ? invoiceCount : item.key === 'leads' ? leadsCount : item.key === 'notifications' ? notificationCount : undefined

@@ -9,6 +9,14 @@ export interface ControlStatus {
   paused: boolean
   keyMode: KeyMode
   scopes: ControlScope[]
+  readOnly: boolean
+}
+
+interface ControlStatusPayload {
+  paused: boolean
+  keyMode: KeyMode
+  scopes: ControlScope[]
+  readOnly?: boolean
 }
 
 function isKeyMode(value: unknown): value is KeyMode {
@@ -21,11 +29,12 @@ function isScope(value: unknown): value is ControlScope {
     && 'access' in value && typeof value.access === 'string'
 }
 
-function isControlStatus(value: unknown): value is ControlStatus {
+function isControlStatus(value: unknown): value is ControlStatusPayload {
   return typeof value === 'object' && value !== null
     && 'paused' in value && typeof value.paused === 'boolean'
     && 'keyMode' in value && isKeyMode(value.keyMode)
     && 'scopes' in value && Array.isArray(value.scopes) && value.scopes.every(isScope)
+    && (!('readOnly' in value) || typeof value.readOnly === 'boolean')
 }
 
 export async function fetchControlStatus(): Promise<ControlStatus> {
@@ -33,7 +42,7 @@ export async function fetchControlStatus(): Promise<ControlStatus> {
   if (!response.ok) throw new Error(`Control request failed (${response.status}).`)
   const payload: unknown = await response.json()
   if (!isControlStatus(payload)) throw new Error('The server returned an invalid control response.')
-  return payload
+  return { paused: payload.paused, keyMode: payload.keyMode, scopes: payload.scopes, readOnly: payload.readOnly ?? false }
 }
 
 export const keyModeLabel: Record<KeyMode, string> = {
