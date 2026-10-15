@@ -1,0 +1,52 @@
+import * as stylex from '@stylexjs/stylex'
+import { tokens } from '../../tokens/tokens.stylex'
+
+export const styles = stylex.create({
+  panel: {
+    minWidth: 0,
+    backgroundColor: tokens.surface,
+    borderColor: tokens.border,
+    borderStyle: 'solid',
+    borderWidth: '1px',
+    borderRadius: tokens.radiusLarge,
+    overflow: 'hidden',
+  },
+  header: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: tokens.space3,
+    paddingBlock: tokens.space4,
+    paddingInline: tokens.space4,
+    borderBottomColor: tokens.border,
+    borderBottomStyle: 'solid',
+    borderBottomWidth: '1px',
+  },
+  title: {
+    color: tokens.ink,
+    fontSize: tokens.textHeading,
+    fontWeight: tokens.weightBold,
+    marginBlockStart: 0,
+    marginBlockEnd: 0,
+  },
+  subtitle: { color: tokens.muted, fontSize: tokens.textSmall, marginBlockStart: tokens.space1, marginBlockEnd: 0 },
+  link: { color: tokens.accent, fontSize: tokens.textSmall, fontWeight: tokens.weightMedium, whiteSpace: 'nowrap' },
+  scroll: { overflowX: 'auto' },
+  table: { width: '100%', borderCollapse: 'collapse', fontSize: tokens.textSmall, color: tokens.ink },
+  cell: {
+    paddingBlock: tokens.space2,
+    paddingInline: tokens.space3,
+    textAlign: 'right',
+    whiteSpace: 'nowrap',
+    borderBottomColor: tokens.border,
+    borderBottomStyle: 'solid',
+    borderBottomWidth: '1px',
+    fontVariantNumeric: 'tabular-nums',
+  },
+  headCell: { color: tokens.muted, fontWeight: tokens.weightMedium },
+  first: { textAlign: 'left' },
+  good: { color: tokens.green },
+  low: { color: tokens.amber },
+  message: { color: tokens.muted, fontSize: tokens.textBody, paddingBlock: tokens.space4, paddingInline: tokens.space4 },
+  warning: { color: tokens.red },
+})

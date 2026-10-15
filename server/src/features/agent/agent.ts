@@ -15,6 +15,8 @@ import {
   type ChannelMessage,
 } from '../ledger/store'
 import { createInvoice, BillingBlockedError, readStripeInvoiceStatus } from '../billing/billing'
+import { vatBreakdownText } from '../books/books'
+import { syncBooks } from '../books/sync'
 import { reply } from '../channels/channel'
 import { canonicalClientName, recallFacts, recallSeededFacts, rememberFact } from '../memory/memory'
 import { leadsCsv, type Lead } from '../leads/leads'
@@ -171,7 +173,7 @@ async function explainLatestInvoice(message: ChannelMessage): Promise<boolean> {
     `Quote: “${line.quote}”\nMemory: ${line.memoryFact}\nPolicy: ${line.clauses.join(', ')}`,
   ).join('\n') ?? 'The evidence details are not available.'
   const text = [
-    `This invoice is £${(invoice.total_pence / 100).toFixed(2)} because the client agreed to the work.`,
+    `This invoice is ${vatBreakdownText(invoice.total_pence)} because the client agreed to the work.`,
     explanation,
     `Policy clauses: ${saved?.decision.clauses.join(', ') ?? 'not recorded'}.`,
     `Stripe invoice: ${invoice.stripe_invoice_id ?? 'not created'}.`,
@@ -199,6 +201,7 @@ async function continueBilling(message: ChannelMessage, saved: SavedDecision): P
       totalPence: decision.totalPence,
       idempotencyKey: message.id,
     }, decision.clauses)
+    syncBooks()
 
     let pdfPath: string | null = null
     try {
@@ -228,7 +231,7 @@ async function continueBilling(message: ChannelMessage, saved: SavedDecision): P
       ? `We found ${leads.length} of the ${intent.quantity} leads requested. The invoice covers only the ${leads.length} delivered.`
       : `${leads.length} leads are ready.`
     await reply(message, [
-      `Invoice created for £${(decision.totalPence / 100).toFixed(2)}.`,
+      `Invoice created for ${vatBreakdownText(decision.totalPence)}.`,
       result.hostedUrl,
       `Invoice PDF: ${pdfUrl}`,
       `Lead list: ${leadUrl}`,
@@ -470,6 +473,7 @@ async function pollInvoices(): Promise<void> {
         stripeInvoiceId: invoice.stripe_invoice_id,
         csvRows: savedLeads?.success ? savedLeads.data.length : 0,
       }, ['P2', 'P6'])
+      syncBooks()
     } catch (error) {
       if (error instanceof BillingBlockedError) return
       console.warn(`Invoice status poll failed for ${invoice.id}: ${String(error)}`)

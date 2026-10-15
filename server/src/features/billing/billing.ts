@@ -2,10 +2,11 @@ import Stripe from 'stripe'
 import type { BillableIntent, Decision } from '../policy/decide'
 import { findClient } from '../clients/clients'
 import { listInvoices, saveInvoice } from '../ledger/store'
+import { ensureVatTaxRate } from '../books/vat-rate'
 
 export class BillingBlockedError extends Error {}
 
-function getStripe(): Stripe {
+export function getStripe(): Stripe {
   const secretKey = process.env.STRIPE_SECRET_KEY
   if (!secretKey?.startsWith('sk_test_') && !secretKey?.startsWith('rk_test_')) {
     throw new BillingBlockedError('Stripe billing requires a key that starts with sk_test_ or rk_test_.')
@@ -47,11 +48,13 @@ export async function createInvoice(
     name: client.name,
     email,
   }, { idempotencyKey: `customer-${messageId}` })
+  const vatTaxRateId = await ensureVatTaxRate(stripe)
 
   await Promise.all(decision.lines.map((line, index) => stripe.invoiceItems.create({
     customer: customer.id,
     amount: line.totalPence,
     currency: 'gbp',
+    tax_rates: [vatTaxRateId],
     description: `${line.description}: ${line.quantity} at ${money(line.unitPricePence)} per lead${
       line.quantity * line.unitPricePence > line.totalPence
         ? `; agreed discount ${money(line.quantity * line.unitPricePence - line.totalPence)}`

@@ -39,6 +39,21 @@ export interface ApprovalRow {
   reason: string
 }
 
+// One row per journal line; a journal is the set of rows sharing journal_id.
+export interface JournalLineRow {
+  journal_id: string
+  line_no: number
+  invoice_id: string
+  kind: string
+  reference: string
+  date: string
+  description: string
+  account: string
+  debit_pence: number
+  credit_pence: number
+  tax_rate: string
+}
+
 export interface AppState {
   messages: ChannelMessage[]
   invoices: InvoiceRow[]
@@ -83,6 +98,20 @@ database.exec(`
     message_id TEXT NOT NULL UNIQUE,
     status TEXT NOT NULL,
     reason TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS journal_lines (
+    journal_id TEXT NOT NULL,
+    line_no INTEGER NOT NULL,
+    invoice_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    reference TEXT NOT NULL,
+    date TEXT NOT NULL,
+    description TEXT NOT NULL,
+    account TEXT NOT NULL,
+    debit_pence INTEGER NOT NULL,
+    credit_pence INTEGER NOT NULL,
+    tax_rate TEXT NOT NULL,
+    PRIMARY KEY (journal_id, line_no)
   );
   CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
@@ -184,6 +213,42 @@ export function listOpenInvoices(): InvoiceRow[] {
   `).all()
 }
 
+export function listEventsByStep(step: string): EventRow[] {
+  return database.query<EventRow, [string]>('SELECT * FROM events WHERE step = ? ORDER BY created_at ASC').all(step)
+}
+
+// Journals are append-only: a journal posted twice keeps its first version.
+export function postJournalLines(lines: JournalLineRow[]): void {
+  const insert = database.query(`
+    INSERT OR IGNORE INTO journal_lines
+      (journal_id, line_no, invoice_id, kind, reference, date, description, account, debit_pence, credit_pence, tax_rate)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `)
+  database.transaction(() => {
+    for (const line of lines) {
+      insert.run(
+        line.journal_id,
+        line.line_no,
+        line.invoice_id,
+        line.kind,
+        line.reference,
+        line.date,
+        line.description,
+        line.account,
+        line.debit_pence,
+        line.credit_pence,
+        line.tax_rate,
+      )
+    }
+  })()
+}
+
+export function listJournalLines(): JournalLineRow[] {
+  return database.query<JournalLineRow, []>(`
+    SELECT * FROM journal_lines ORDER BY date ASC, rowid ASC
+  `).all()
+}
+
 export function saveApproval(approval: ApprovalRow): void {
   database.query(`
     INSERT INTO approvals (id, message_id, status, reason) VALUES (?, ?, ?, ?)
@@ -221,7 +286,7 @@ export function getState(): AppState {
 }
 
 export function resetLedger(): void {
-  database.exec('DELETE FROM events; DELETE FROM invoices; DELETE FROM approvals; DELETE FROM messages;')
+  database.exec('DELETE FROM events; DELETE FROM invoices; DELETE FROM approvals; DELETE FROM messages; DELETE FROM journal_lines;')
 }
 
 export function getSetting(key: string): string | null {

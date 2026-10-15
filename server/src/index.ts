@@ -7,6 +7,7 @@ import { handleApproval, startAgentLoop } from './features/agent/agent'
 import { getApproval, getEvent, getInvoice, getState } from './features/ledger/store'
 import { leadsCsv } from './features/leads/leads'
 import { controlStatus } from './features/control/control'
+import { booksRoutes } from './features/books/routes'
 
 const leadsSchema = z.array(z.object({
   name: z.string(),
@@ -20,6 +21,7 @@ app.get('/health', (context) => context.json({ status: 'ok' }))
 app.get('/api/state', (context) => context.json(getState()))
 app.route('/api/channels', channelRoutes)
 app.get('/api/control', (context) => context.json(controlStatus()))
+app.route('/api/books', booksRoutes)
 
 app.post('/api/approvals/:id', async (context) => {
   const messageId = context.req.param('id')
