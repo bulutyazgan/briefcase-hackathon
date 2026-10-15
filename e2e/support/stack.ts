@@ -37,12 +37,14 @@ export async function seedCogneeFromProductSeed(): Promise<void> {
 export function serverEnv(dbPath: string): Record<string, string> {
   const env: Record<string, string> = {}
   for (const [key, value] of Object.entries(process.env)) {
-    if (value !== undefined && !/^(FIREWORKS|FIRECRAWL|SLACK|STRIPE|TREG|COGNEE)_/.test(key)) env[key] = value
+    if (value !== undefined && !/^(FIREWORKS|FIRECRAWL|OPENAI|SLACK|STRIPE|TREG|COGNEE)_/.test(key)) env[key] = value
   }
   return {
     ...env,
     PORT: String(apiPort),
     TALLY_DB_PATH: dbPath,
+    // Bun fills a missing key from server/.env but keeps a preset one, so an empty key pins the heuristic extractor.
+    OPENAI_API_KEY: '',
     STRIPE_SECRET_KEY: process.env.E2E_STRIPE_KEY ?? 'sk_test_mock',
     STRIPE_API_BASE: mockBase,
     TREG_TOKEN: 'mock',

@@ -222,13 +222,22 @@ export function getEvent(messageId: string, step: string): EventRow | null {
   `).get(messageId, step) ?? null
 }
 
+const EVENT_WINDOW = 250
+
+// The bounded newest-first reader for decision rows. Meter rows are per lead (two per qualified
+// lead), have their own reader in listStepEvents, and would push an order's decide row out of the window.
 export function listEvents(messageId?: string): EventRow[] {
   if (messageId) {
     return database.query<EventRow, [string]>(`
-      SELECT * FROM events WHERE message_id = ? ORDER BY created_at DESC LIMIT 250
+      SELECT * FROM events WHERE message_id = ? AND step != 'meter' ORDER BY created_at DESC LIMIT ${EVENT_WINDOW}
     `).all(messageId)
   }
-  return database.query<EventRow, []>('SELECT * FROM events ORDER BY created_at DESC LIMIT 250').all()
+  return database.query<EventRow, []>(`SELECT * FROM events WHERE step != 'meter' ORDER BY created_at DESC LIMIT ${EVENT_WINDOW}`).all()
+}
+
+// The audit trail lists usage metering, so the state window carries the newest meter rows as their own bounded slice.
+function listMeterEvents(): EventRow[] {
+  return database.query<EventRow, []>(`SELECT * FROM events WHERE step = 'meter' ORDER BY created_at DESC LIMIT ${EVENT_WINDOW}`).all()
 }
 
 export function listEventsByStep(step: string): EventRow[] {
@@ -352,7 +361,7 @@ export function getState(): AppState {
     messages: database.query<ChannelMessage, []>('SELECT * FROM messages ORDER BY ts DESC LIMIT 150').all(),
     invoices: listInvoices(),
     approvals: listApprovals(),
-    events: listEvents(),
+    events: [...listEvents(), ...listMeterEvents()].sort((left, right) => right.created_at.localeCompare(left.created_at)),
   }
 }
 
