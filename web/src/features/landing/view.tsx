@@ -1,159 +1,69 @@
 import * as stylex from '@stylexjs/stylex'
+import { Button } from '../../components/ui/button'
+import { Closing, Page, Opening, Section } from '../../components/ui/page'
+import { StatStrip } from '../../components/ui/stat-strip'
+import { Text } from '../../components/ui/text'
+import { content } from '../../components/ui/content.stylex'
+import { Link, navigate } from '../../router'
 import { styles } from './landing.stylex'
 
-const REPO_URL = 'https://github.com/cf0-enterprise/briefcase-hackathon'
-
-const STEPS = [
-  { title: 'Hears the yes', body: 'Tally reads client threads in Slack and email. It acts only on a clear commitment, and it keeps the exact quote.' },
-  { title: 'Remembers the deal', body: 'Cognee holds what each client agreed, promised and disputed. "Same deal as last time" means something.' },
-  { title: 'Decides in code', body: 'Rate card, discount cap and approval limit are policy, not prompts. The model never picks a price.' },
-  { title: 'Bills in Stripe', body: 'A real invoice, a PDF with the evidence attached, and delivery of the work as soon as it is paid.' },
-]
-
-const POLICY = [
-  ['P1', 'Bill only from an explicit client commitment.'],
-  ['P2', 'Prices come from the rate card only.'],
-  ['P3', 'Discounts only if remembered as agreed, never above 15%.'],
-  ['P4', 'Auto-send up to £1,000. Above that, one approval.'],
-  ['P5', 'Known clients only. Unknown means ask, not bill.'],
-  ['P6', 'One invoice per commitment.'],
-  ['P7', 'Never chase a disputed line.'],
+const steps = [
+  ['01', 'Hear the commitment', 'Read the client’s words and keep the exact quote as evidence.'],
+  ['02', 'Recall the agreement', 'Use dated client facts to apply remembered rates, terms and discounts.'],
+  ['03', 'Check the policy', 'Code decides the price, approval path and whether the commitment can be billed.'],
+  ['04', 'Collect and deliver', 'Create a Stripe invoice, then deliver the work when payment is confirmed.'],
 ] as const
 
-const CHANNELS = ['Slack', 'Email', 'Stripe', 'Cognee', 'Firecrawl', 'Simulator']
+const clauses = [
+  ['P1', 'Bill only from explicit client commitments.'],
+  ['P2', 'Use the rate card for every price.'],
+  ['P3', 'Apply only remembered discounts, up to 15%.'],
+  ['P4', 'Request approval above £1,000.'],
+  ['P5', 'Bill known clients only.'],
+  ['P6', 'Create one invoice per commitment.'],
+  ['P7', 'Limit reminders and respect disputes.'],
+] as const
 
 export function Landing() {
   return (
     <div {...stylex.props(styles.root)}>
-      <section {...stylex.props(styles.hero)}>
-        <div aria-hidden="true" {...stylex.props(styles.heroGlow)} />
-        <nav {...stylex.props(styles.nav)}>
-          <span {...stylex.props(styles.navBrand)}>
-            <span aria-hidden="true" {...stylex.props(styles.navDot)} />
-            tally
-          </span>
-          <span {...stylex.props(styles.navLinks)}>
-            <a href="#how" {...stylex.props(styles.navLink)}>How it works</a>
-            <a href="#policy" {...stylex.props(styles.navLink)}>Policy</a>
-          </span>
-          <a href="/app" {...stylex.props(styles.navCta)}>Open Tally</a>
-        </nav>
-
-        <div {...stylex.props(styles.heroGrid)}>
-          <div>
-            <h1 {...stylex.props(styles.heroTitle)}>
-              Meet Tally,
-              <br />
-              the agent that bills what clients already agreed.
-            </h1>
-            <p {...stylex.props(styles.heroLede)}>
-              Work gets agreed in chat and never invoiced. Tally hears the yes, prices it by your policy and raises the Stripe invoice, with every pound explained.
-            </p>
-            <div {...stylex.props(styles.heroActions)}>
-              <a href="/app" {...stylex.props(styles.pillLight)}>See it bill</a>
-              <a href={REPO_URL} {...stylex.props(styles.pillGlass)}>Read the code</a>
+      <nav aria-label="Site navigation" {...stylex.props(styles.nav)}>
+        <Link to="/" {...stylex.props(styles.brand)}><span aria-hidden="true" {...stylex.props(styles.dot)} />Tally</Link>
+        <div {...stylex.props(styles.links)}><a href="#how" {...stylex.props(styles.navLink)}>How it works</a><a href="#policy" {...stylex.props(styles.navLink)}>Policy</a><Link to="/app/inbox" {...stylex.props(content.link)}>Open the inbox</Link></div>
+      </nav>
+      <div {...stylex.props(styles.content)}>
+        <Page>
+          <div {...stylex.props(styles.hero)}>
+            <Opening title="Turn client commitments into invoices, with every pound explained." lede="Tally listens for agreed work, checks it against a written billing policy and prepares the Stripe invoice with its evidence attached." tools={<Button variant="primary" onClick={() => navigate('/app/inbox')}>Explore Tally</Button>} />
+            <div {...stylex.props(styles.heroCard)}>
+              <Text role="label">A client commitment</Text>
+              <div {...stylex.props(styles.message)}>“Let’s kick off Q4. 300 fintech CFO leads in London, same deal as last time.”</div>
+              <div {...stylex.props(styles.reply)}>300 leads at £4 each, less the remembered 10% discount. £1,080 is ready for approval under P4.</div>
+              <div {...stylex.props(content.row)}><Text role="compact">Stripe invoice</Text><span {...stylex.props(styles.money)}>£1,080.00</span></div>
             </div>
           </div>
-
-          <div {...stylex.props(styles.glassCard)}>
-            <p {...stylex.props(styles.cardLabel)}>#northwind-campaigns</p>
-            <div {...stylex.props(styles.bubble)}>
-              <span {...stylex.props(styles.bubbleAuthor)}>Priya · Northwind</span>
-              Let's kick off Q4. 300 fintech CFO leads in London, same deal as last time.
+          <StatStrip items={[
+            { label: 'Policy clauses', value: '7', mono: true },
+            { label: 'Lead rate', value: '£4', mono: true },
+            { label: 'Approval limit', value: '£1,000', mono: true },
+          ]} />
+          <Section title="From a client message to a paid invoice" description="A clear path from agreement to delivery" >
+            <div id="how" {...stylex.props(styles.steps)}>{steps.map(([number, title, body]) => <article key={number} {...stylex.props(styles.step)}><span {...stylex.props(styles.stepNumber)}>{number}</span><Text role="heading16" as="h3">{title}</Text><Text role="compact">{body}</Text></article>)}</div>
+          </Section>
+          <Section title="Every amount has a source" description="The invoice carries the evidence behind its total">
+            <div {...stylex.props(content.card)}>
+              <div {...stylex.props(styles.evidence)}><Text role="label">Client quote</Text><Text role="compact">300 fintech CFO leads in London</Text></div>
+              <div {...stylex.props(styles.evidence)}><Text role="label">Memory</Text><Text role="compact">Agreed 10% off orders over 200 leads</Text></div>
+              <div {...stylex.props(styles.evidence)}><Text role="label">Arithmetic</Text><span {...stylex.props(styles.money)}>300 × £4.00 − 10% = £1,080.00</span></div>
+              <div {...stylex.props(styles.evidence)}><Text role="label">Policy</Text><Text role="compact">P1, P2, P3 and P4</Text></div>
             </div>
-            <div {...stylex.props(styles.bubble, styles.bubbleTally)}>
-              <span {...stylex.props(styles.bubbleAuthor)}>Tally</span>
-              300 leads × £4, less the 10% agreed on 12 Aug. Invoice £1,080 is ready. It needs one approval under P4.
-            </div>
-            <div {...stylex.props(styles.invoiceChip)}>
-              <span>INV-0042 · Stripe</span>
-              <span {...stylex.props(styles.invoiceAmount)}>£1,080.00</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <main {...stylex.props(styles.main)}>
-        <section id="how" {...stylex.props(styles.section)}>
-          <h2 {...stylex.props(styles.sectionTitle)}>Tally hears it, prices it, bills it, and shows its work.</h2>
-          <div {...stylex.props(styles.steps)}>
-            {STEPS.map((step, index) => (
-              <article key={step.title} {...stylex.props(styles.step)}>
-                <span {...stylex.props(styles.stepIndex)}>0{index + 1}</span>
-                <h3 {...stylex.props(styles.stepTitle)}>{step.title}</h3>
-                <p {...stylex.props(styles.stepBody)}>{step.body}</p>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section {...stylex.props(styles.section)}>
-          <div {...stylex.props(styles.panel)}>
-            <div>
-              <h2 {...stylex.props(styles.sectionTitle)}>Every pound explained.</h2>
-              <p {...stylex.props(styles.panelBody)}>
-                Ask "why did you bill £1,080?" in any channel. Tally answers from its ledger: the client's words, the remembered deal, and the policy clause it relied on.
-              </p>
-            </div>
-            <div {...stylex.props(styles.evidence)}>
-              <div {...stylex.props(styles.evidenceRow)}>
-                <span {...stylex.props(styles.evidenceKey)}>Quote</span>
-                <span>"300 fintech CFO leads in London, same deal as last time."</span>
-              </div>
-              <div {...stylex.props(styles.evidenceRow)}>
-                <span {...stylex.props(styles.evidenceKey)}>Memory</span>
-                <span>2026-08-12 · agreed 10% off orders over 200 leads</span>
-              </div>
-              <div {...stylex.props(styles.evidenceRow)}>
-                <span {...stylex.props(styles.evidenceKey)}>Policy</span>
-                <span {...stylex.props(styles.clauses)}>
-                  {['P1', 'P2', 'P3', 'P4'].map((clause) => (
-                    <span key={clause} {...stylex.props(styles.clause)}>{clause}</span>
-                  ))}
-                </span>
-              </div>
-              <div {...stylex.props(styles.evidenceRow)}>
-                <span {...stylex.props(styles.evidenceKey)}>Amount</span>
-                <span {...stylex.props(styles.mono)}>300 × £4.00 − 10% = £1,080.00</span>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section id="policy" {...stylex.props(styles.section, styles.split)}>
-          <h2 {...stylex.props(styles.sectionTitle)}>Autonomy, inside a written policy.</h2>
-          <ol {...stylex.props(styles.policyList)}>
-            {POLICY.map(([id, text]) => (
-              <li key={id} {...stylex.props(styles.policyItem)}>
-                <span {...stylex.props(styles.clause)}>{id}</span>
-                <span>{text}</span>
-              </li>
-            ))}
-          </ol>
-        </section>
-
-        <section {...stylex.props(styles.section, styles.split)}>
-          <h2 {...stylex.props(styles.sectionTitle)}>Tally works where your clients talk.</h2>
-          <div {...stylex.props(styles.channels)}>
-            {CHANNELS.map((channel) => (
-              <span key={channel} {...stylex.props(styles.channel)}>{channel}</span>
-            ))}
-          </div>
-        </section>
-
-        <section {...stylex.props(styles.closing)}>
-          <h2 {...stylex.props(styles.closingTitle)}>Stop leaving agreed work unbilled.</h2>
-          <div {...stylex.props(styles.heroActions, styles.closingActions)}>
-            <a href="/app" {...stylex.props(styles.pillDark)}>Open Tally</a>
-            <a href={REPO_URL} {...stylex.props(styles.pillOutline)}>GitHub</a>
-          </div>
-        </section>
-      </main>
-
-      <footer {...stylex.props(styles.footer)}>
-        <span>Tally · Stripe x Briefcase AI FinTech Hackathon, London 2026</span>
-        <span>Stripe test mode only. No real money moves.</span>
-      </footer>
+          </Section>
+          <Section title="Autonomy inside a written policy" description="Billing decisions follow seven rules">
+            <div id="policy" {...stylex.props(styles.policyGrid)}>{clauses.map(([id, clause]) => <div key={id} {...stylex.props(styles.policyItem)}><span {...stylex.props(content.clause)}>{id}</span><Text role="compact">{clause}</Text></div>)}</div>
+          </Section>
+          <Closing>Every invoice keeps the client’s words, the remembered agreement and the policy decision together.</Closing>
+        </Page>
+      </div>
     </div>
   )
 }

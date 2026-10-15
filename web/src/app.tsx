@@ -1,12 +1,20 @@
-import { useEffect, useSyncExternalStore, type ReactNode } from 'react'
 import * as stylex from '@stylexjs/stylex'
+import { useSyncExternalStore } from 'react'
+import type { ReactNode } from 'react'
+import type { AppState } from './api'
 import { getSnapshot, refreshState, subscribe } from './app-state'
+import { AppShell } from './components/layout/app-shell'
+import { Button } from './components/ui/button'
+import { content } from './components/ui/content.stylex'
+import { Opening, Page, Section } from './components/ui/page'
+import { SkeletonBar, SkeletonSwap } from './components/ui/skeleton'
+import { StatStrip } from './components/ui/stat-strip'
+import { Text } from './components/ui/text'
 import { Audit } from './features/audit/view'
-import { Inbox, PendingApprovals } from './features/inbox/view'
-import { Invoices } from './features/invoices/view'
+import { Inbox } from './features/inbox/view'
+import { InvoiceDetail, Invoices } from './features/invoices/view'
 import { Policy } from './features/policy/view'
-import { Link, navigate, usePath } from './router'
-import { styles } from './app.stylex'
+import { navigate, usePath } from './router'
 
 type Route =
   | { page: 'inbox' }
@@ -21,10 +29,10 @@ function resolveRoute(path: string): Route {
   if (path === '/app/invoices') return { page: 'invoices' }
   if (path === '/app/audit') return { page: 'audit' }
   if (path === '/app/policy') return { page: 'policy' }
-  const invoiceMatch = path.match(/^\/app\/invoices\/([^/]+)$/)
-  if (invoiceMatch) {
+  const match = path.match(/^\/app\/invoices\/([^/]+)$/)
+  if (match) {
     try {
-      return { page: 'invoice-detail', invoiceId: decodeURIComponent(invoiceMatch[1]) }
+      return { page: 'invoice-detail', invoiceId: decodeURIComponent(match[1]) }
     } catch {
       return { page: 'not-found' }
     }
@@ -32,222 +40,78 @@ function resolveRoute(path: string): Route {
   return { page: 'not-found' }
 }
 
-function PageHeader({
-  title,
-  subtitle,
-  actions,
-}: {
-  title: string
-  subtitle: string
-  actions: ReactNode
-}) {
+function SkeletonRows({ count = 4 }: { count?: number }) {
+  return <div {...stylex.props(content.stack)}>{Array.from({ length: count }, (_, index) => <SkeletonBar key={index} width={index % 2 ? 'md' : 'full'} height="text" />)}</div>
+}
+
+function Placeholder({ error, shape = 'list' }: { error: boolean; shape?: 'list' | 'thread' | 'pdf' }) {
+  const skeletonShape = shape === 'pdf' ? content.pdfPlaceholder : shape === 'thread' ? content.threadPlaceholder : content.listPlaceholder
+  const errorShape = shape === 'pdf' ? content.pdfErrorPanel : shape === 'thread' ? content.threadErrorPanel : content.listErrorPanel
+  return error
+    ? <div aria-hidden="true" {...stylex.props(content.errorPanel, errorShape)} />
+    : <div {...stylex.props(content.card, content.stack, skeletonShape)}><SkeletonRows count={4} /></div>
+}
+
+function PageSkeleton({ route, error, onRetry }: { route: Route; error: boolean; onRetry: () => void }) {
+  const title: ReactNode = error ? 'We could not load the ledger' : <SkeletonBar width="lg" height="control" />
+  const lede: ReactNode = error ? 'The ledger did not respond; retry now or wait for the next update.' : <SkeletonBar width="md" />
+  const tools = error ? <Button variant="primary" onClick={onRetry}>Retry</Button> : <SkeletonBar width="sm" height="control" />
   return (
-    <header {...stylex.props(styles.pageHeader)}>
-      <div>
-        <h1 {...stylex.props(styles.heading)}>{title}</h1>
-        <p {...stylex.props(styles.subtitle)}>{subtitle}</p>
-      </div>
-      <div {...stylex.props(styles.actions)}>{actions}</div>
-    </header>
+    <Page>
+      <Opening title={title} lede={lede} tools={tools} />
+      <StatStrip items={[
+        { label: 'Messages', value: error ? '—' : <SkeletonBar width="sm" /> },
+        { label: 'Invoices', value: error ? '—' : <SkeletonBar width="sm" /> },
+        { label: 'Activity', value: error ? '—' : <SkeletonBar width="sm" /> },
+      ]} />
+      {route.page === 'inbox' ? <div {...stylex.props(content.twoCol)}>
+        <Section title="Client channel" description={error ? undefined : 'Simulator thread and agent responses'}><Placeholder error={error} shape="thread" /></Section>
+        <Section title="Pending approvals" description={error ? undefined : 'Review before billing'}><Placeholder error={error} /></Section>
+      </div> : route.page === 'invoice-detail' ? <div {...stylex.props(content.twoCol)}>
+        <Section title="Invoice PDF" description={error ? undefined : 'Invoice and evidence appendix'}><Placeholder error={error} shape="pdf" /></Section>
+        <Section title="Evidence trail" description={error ? undefined : 'The agreement behind the amount'}><Placeholder error={error} /></Section>
+      </div> : <Section title={route.page === 'audit' ? 'Audit trail' : 'Invoices'} description={error ? undefined : 'Recent activity and records'}><Placeholder error={error} /></Section>}
+    </Page>
   )
 }
 
-function ShellNavigation({
-  path,
-  invoiceCount,
-  pendingCount,
-}: {
-  path: string
-  invoiceCount: number
-  pendingCount: number
-}) {
-  const currentPage = path === '/app/invoices' || path.startsWith('/app/invoices/')
-    ? 'invoices'
-    : path.split('/')[2]
-  const items: { label: string; to: string; key: string; count?: number }[] = [
-    { label: 'Inbox', to: '/app/inbox', key: 'inbox', count: pendingCount },
-    { label: 'Invoices', to: '/app/invoices', key: 'invoices', count: invoiceCount },
-    { label: 'Audit', to: '/app/audit', key: 'audit' },
-    { label: 'Policy', to: '/app/policy', key: 'policy' },
-  ]
-
-  return (
-    <nav {...stylex.props(styles.nav)} aria-label="Main navigation">
-      {items.map((item) => {
-        const active = item.key === currentPage
-        return (
-          <Link
-            key={item.key}
-            to={item.to}
-            aria-current={active ? 'page' : undefined}
-            {...stylex.props(styles.navLink, active && styles.activeNavLink)}
-          >
-            <span>{item.label}</span>
-            {item.count !== undefined && (
-              <span
-                {...stylex.props(styles.count, active && styles.activeCount)}
-                aria-label={`${item.count} ${item.label === 'Inbox' ? 'pending approvals' : 'invoices'}`}
-              >
-                {item.count}
-              </span>
-            )}
-          </Link>
-        )
-      })}
-    </nav>
-  )
+function NotFound() {
+  return <Page><Opening title="This page is not available" lede="Choose a page from the sidebar to continue." /></Page>
 }
 
-function LoadingState() {
-  return (
-    <div {...stylex.props(styles.state)} role="status" aria-live="polite">
-      <p {...stylex.props(styles.stateTitle)}>Loading dashboard</p>
-      <p {...stylex.props(styles.stateMessage)}>Connecting to the invoice ledger…</p>
-    </div>
-  )
-}
-
-function ErrorState({ message }: { message: string }) {
-  return (
-    <div {...stylex.props(styles.state)} role="alert">
-      <p {...stylex.props(styles.stateTitle)}>Dashboard unavailable</p>
-      <p {...stylex.props(styles.stateMessage, styles.stateError)}>{message}</p>
-      <button type="button" {...stylex.props(styles.primaryPill)} onClick={() => void refreshState()}>
-        Try again
-      </button>
-    </div>
-  )
+function RouteContent({ route, state, onRefresh }: { route: Route; state: AppState; onRefresh: () => void }) {
+  if (route.page === 'inbox') return <Inbox state={state} onRefresh={onRefresh} />
+  if (route.page === 'invoices') return <Invoices state={state} />
+  if (route.page === 'invoice-detail') return <InvoiceDetail state={state} invoiceId={route.invoiceId} onRefresh={onRefresh} />
+  if (route.page === 'audit') return <Audit state={state} />
+  return <Policy />
 }
 
 export function App() {
   const path = usePath()
   const { state, error } = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+  if (path === '/app') {
+    navigate('/app/inbox')
+    return null
+  }
   const route = resolveRoute(path)
   const invoiceCount = state?.invoices.length ?? 0
   const pendingCount = state?.approvals.filter((approval) => approval.status === 'pending').length ?? 0
+  const needsState = route.page !== 'policy' && route.page !== 'not-found'
+  const loading = needsState && !state && !error
+  const contentToRender = route.page === 'not-found'
+    ? <NotFound />
+    : route.page === 'policy'
+      ? <Policy />
+      : error
+        ? <PageSkeleton route={route} error onRetry={() => void refreshState()} />
+        : state
+        ? <RouteContent route={route} state={state} onRefresh={() => void refreshState()} />
+        : <PageSkeleton route={route} error={false} onRetry={() => void refreshState()} />
 
-  useEffect(() => {
-    if (path === '/app') navigate('/app/inbox')
-  }, [path])
-
-  if (path === '/app') return null
-
-  let title = 'Page not found'
-  let subtitle = 'That dashboard page is not available.'
-  let actions: ReactNode = <Link to="/app/inbox" {...stylex.props(styles.primaryPill)}>Go to inbox</Link>
-
-  if (route.page === 'inbox') {
-    title = 'Inbox'
-    subtitle = 'Review client commitments and pending approvals.'
-    actions = (
-      <>
-        <button
-          type="button"
-          {...stylex.props(styles.primaryPill)}
-          onClick={() => document.getElementById('message-text')?.focus()}
-        >
-          New message
-        </button>
-        <Link to="/app/audit" {...stylex.props(styles.secondaryPill)}>View audit</Link>
-      </>
-    )
-  } else if (route.page === 'invoices') {
-    title = 'Invoices'
-    subtitle = 'Every amount is policy checked and backed by evidence.'
-    actions = (
-      <>
-        <Link to="/app/inbox" {...stylex.props(styles.primaryPill)}>New invoice request</Link>
-        <Link to="/app/audit" {...stylex.props(styles.secondaryPill)}>View audit</Link>
-      </>
-    )
-  } else if (route.page === 'invoice-detail') {
-    title = 'Invoice detail'
-    subtitle = `Invoice ${route.invoiceId} and its supporting evidence.`
-    const invoice = state?.invoices.find((item) => item.id === route.invoiceId)
-    actions = (
-      <>
-        {invoice?.hosted_url && (
-          <a href={invoice.hosted_url} target="_blank" rel="noreferrer" {...stylex.props(styles.primaryPill)}>
-            Open Stripe invoice
-          </a>
-        )}
-        <Link to="/app/invoices" {...stylex.props(styles.secondaryPill)}>All invoices</Link>
-      </>
-    )
-  } else if (route.page === 'audit') {
-    title = 'Audit'
-    subtitle = 'A trace of the decisions, evidence, and invoice events.'
-    actions = (
-      <>
-        <button type="button" {...stylex.props(styles.primaryPill)} onClick={() => void refreshState()}>
-          Refresh
-        </button>
-        <Link to="/app/policy" {...stylex.props(styles.secondaryPill)}>View policy</Link>
-      </>
-    )
-  } else if (route.page === 'policy') {
-    title = 'Billing policy'
-    subtitle = 'The rules Tally applies before it prepares an invoice.'
-    actions = <Link to="/app/inbox" {...stylex.props(styles.secondaryPill)}>Back to inbox</Link>
-  }
-
-  return (
-    <main {...stylex.props(styles.page)}>
-      <aside {...stylex.props(styles.rail)} aria-label="Tally app navigation">
-        <div {...stylex.props(styles.brand)}>
-          <span aria-hidden="true" {...stylex.props(styles.brandDot)} />
-          <span {...stylex.props(styles.wordmark)}>tally</span>
-        </div>
-        <ShellNavigation path={path} invoiceCount={invoiceCount} pendingCount={pendingCount} />
-        <div {...stylex.props(styles.railFooter)}>
-          <span {...stylex.props(styles.modePill)}>Stripe test mode</span>
-          <Link to="/" {...stylex.props(styles.backLink)}>Back to site</Link>
-        </div>
-      </aside>
-      <section {...stylex.props(styles.content)} aria-label={`${title} page`}>
-        <PageHeader title={title} subtitle={subtitle} actions={actions} />
-        <div {...stylex.props(styles.pageBody)}>
-          {error && state && <p role="alert">{error} Trying again automatically.</p>}
-          {error && !state
-            ? <ErrorState message={error} />
-            : !state
-              ? <LoadingState />
-              : route.page === 'inbox'
-                ? (
-                  <div {...stylex.props(styles.inboxGrid)}>
-                    <Inbox state={state} onRefresh={() => void refreshState()} />
-                    <PendingApprovals state={state} onRefresh={() => void refreshState()} />
-                  </div>
-                )
-                : route.page === 'invoices'
-                  ? (
-                    <Invoices
-                      state={state}
-                      mode="list"
-                      onSelect={(invoiceId) => navigate(`/app/invoices/${encodeURIComponent(invoiceId)}`)}
-                    />
-                  )
-                  : route.page === 'invoice-detail'
-                    ? (
-                      <Invoices
-                        state={state}
-                        mode="detail"
-                        selectedInvoiceId={route.invoiceId}
-                        onSelect={(invoiceId) => navigate(`/app/invoices/${encodeURIComponent(invoiceId)}`)}
-                      />
-                    )
-                    : route.page === 'audit'
-                      ? <Audit events={state.events} />
-                      : route.page === 'policy'
-                        ? <Policy />
-                        : (
-                          <div {...stylex.props(styles.state)} role="status">
-                            <p {...stylex.props(styles.stateTitle)}>Page not found</p>
-                            <p {...stylex.props(styles.stateMessage)}>Choose a page from the navigation to continue.</p>
-                          </div>
-                        )}
-        </div>
-      </section>
-    </main>
-  )
+  return <AppShell path={path} invoiceCount={invoiceCount} pendingCount={pendingCount}>
+    <SkeletonSwap loading={loading} skeleton={<PageSkeleton route={route} error={false} onRetry={() => void refreshState()} />}>
+      {contentToRender}
+    </SkeletonSwap>
+  </AppShell>
 }

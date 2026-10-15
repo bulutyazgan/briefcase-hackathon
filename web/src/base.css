@@ -1,7 +1,32 @@
-@font-face { font-family: Amiamie; src: url('/fonts/Amiamie-Light.woff2') format('woff2'); font-weight: 300; font-display: swap; }
-@font-face { font-family: Amiamie; src: url('/fonts/Amiamie-Regular.woff2') format('woff2'); font-weight: 400; font-display: swap; }
-@font-face { font-family: Amiamie; src: url('/fonts/Amiamie-Black.woff2') format('woff2'); font-weight: 900; font-display: swap; }
-@font-face { font-family: 'Geist Mono'; src: url('/fonts/geist-mono-latin-ext-variable.woff2') format('woff2'); font-weight: 100 900; font-display: swap; }
+@font-face {
+  font-family: "Geist";
+  src: url("/fonts/geist-latin-variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Geist";
+  src: url("/fonts/geist-latin-ext-variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+  unicode-range: U+0100-024F, U+1E00-1EFF;
+}
+
+@font-face {
+  font-family: "Geist Mono";
+  src: url("/fonts/geist-mono-latin-variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Geist Mono";
+  src: url("/fonts/geist-mono-latin-ext-variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+  unicode-range: U+0100-024F, U+1E00-1EFF;
+}
 
 * {
   box-sizing: border-box;
@@ -9,13 +34,14 @@
 
 html {
   min-width: 320px;
-  background: #f7f8f7;
 }
 
 body {
   min-width: 320px;
   margin: 0;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "Geist", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 button,
